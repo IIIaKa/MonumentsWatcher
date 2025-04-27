@@ -44,13 +44,16 @@ The list of all monuments can be viewed in the:
 {
   "Chat command": "monument",
   "Is it worth enabling GameTips for messages?": true,
+  "List of language keys for creating language files": [
+    "en"
+  ],
   "Is it worth recreating boundaries(excluding custom monuments) upon detecting a wipe?": true,
   "List of tracked categories of monuments. Leave blank to track all": [],
   "Wipe ID": null,
   "Version": {
     "Major": 0,
     "Minor": 1,
-    "Patch": 7
+    "Patch": 8
   }
 }
 ```  

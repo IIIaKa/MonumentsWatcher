@@ -45,7 +45,7 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-	[Info("Monuments Watcher", "IIIaKa", "0.1.7")]
+	[Info("Monuments Watcher", "IIIaKa", "0.1.8")]
 	[Description("A plugin that allows other plugins to interact with players and entities in monuments via API.")]
 	class MonumentsWatcher : RustPlugin
     {
@@ -57,8 +57,7 @@ namespace Oxide.Plugins
 			Hooks_OnPlayerExitedMonument = "OnPlayerExitedMonument", Hooks_OnNpcExitedMonument = "OnNpcExitedMonument", Hooks_OnEntityExitedMonument = "OnEntityExitedMonument";
         private static Hash<string, MonumentWatcher> _monumentsList;
 		private static Hash<ulong, List<MonumentWatcher>> _playersInMonuments;
-        private static Hash<NetworkableId, List<MonumentWatcher>> _npcsInMonuments;
-        private static Hash<NetworkableId, List<MonumentWatcher>> _entitiesInMonuments;
+        private static Hash<NetworkableId, List<MonumentWatcher>> _npcsInMonuments, _entitiesInMonuments;
         private BoundsValues _cargoBounds;
 		#endregion
 
@@ -73,11 +72,14 @@ namespace Oxide.Plugins
 			[JsonProperty(PropertyName = "Is it worth enabling GameTips for messages?")]
 			public bool GameTips_Enabled = true;
 			
+			[JsonProperty(PropertyName = "List of language keys for creating language files")]
+            public List<string> LanguageKeys;
+			
 			[JsonProperty(PropertyName = "Is it worth recreating boundaries(excluding custom monuments) upon detecting a wipe?")]
 			public bool RecreateOnWipe = true;
 			
 			[JsonProperty(PropertyName = "List of tracked categories of monuments. Leave blank to track all")]
-			public HashSet<MonumentCategory> TrackedCategories = null;
+			public HashSet<MonumentCategory> TrackedCategories;
 			
 			[JsonProperty(PropertyName = "Wipe ID")]
 			public string WipeID = string.Empty;
@@ -104,6 +106,22 @@ namespace Oxide.Plugins
 			
 			if (string.IsNullOrWhiteSpace(_config.Command))
 				_config.Command = "monument";
+			
+			if (_config.LanguageKeys == null)
+                _config.LanguageKeys = new List<string>();
+            if (_config.LanguageKeys.Any())
+            {
+                for (int i = _config.LanguageKeys.Count - 1; i >= 0; i--)
+                {
+                    string langKey = ToLangKey(_config.LanguageKeys[i]);
+                    if (langKey.Equals("en", StringComparison.OrdinalIgnoreCase) || langKey.Equals("ru", StringComparison.OrdinalIgnoreCase))
+                        _config.LanguageKeys.RemoveAt(i);
+                    else
+                        _config.LanguageKeys[i] = langKey;
+                }
+            }
+            _config.LanguageKeys.Add("en");
+			
 			if (_config.TrackedCategories == null)
 				_config.TrackedCategories = new HashSet<MonumentCategory>();
 			
@@ -171,6 +189,8 @@ namespace Oxide.Plugins
 			["harbor_1_station"] = "Large Harbor Station",
 			["harbor_2"] = "Small Harbor",
 			["harbor_2_station"] = "Harbor Station",
+			["jungle_ziggurat_a"] = "Ziggurat",
+			["jungle_ziggurat_a_station"] = "Ziggurat Station",
 			["junkyard_1"] = "Junkyard",
 			["junkyard_1_station"] = "Junkyard Station",
 			["launch_site_1"] = "Launch Site",
@@ -187,8 +207,8 @@ namespace Oxide.Plugins
 			["oilrig_2"] = "Oil Rig",
 			["powerplant_1"] = "Power Plant",
 			["powerplant_1_station"] = "Power Plant Station",
-			["radtown_1"] = "Toxic Village",
-            ["radtown_1_station"] = "Toxic Village Station",
+			["radtown_1"] = "Rad Town",
+            ["radtown_1_station"] = "Rad Town Station",
 			["radtown_small_3"] = "Sewer Branch",
 			["radtown_small_3_station"] = "Sewer Branch Station",
 			["satellite_dish"] = "Satellite Dish",
@@ -241,6 +261,11 @@ namespace Oxide.Plugins
 			["power_sub_small_2"] = "Substation",
 			["power_sub_big_1"] = "Large Substation",
 			["power_sub_big_2"] = "Large Substation",
+			["jungle_ruins_a"] = "Jungle Ruins",
+            ["jungle_ruins_b"] = "Jungle Ruins",
+            ["jungle_ruins_c"] = "Jungle Ruins",
+            ["jungle_ruins_d"] = "Jungle Ruins",
+			["jungle_ruins_e"] = "Jungle Ruins",
 			["water_well_a"] = "Water Well",
 			["water_well_b"] = "Water Well",
 			["water_well_c"] = "Water Well",
@@ -304,6 +329,8 @@ namespace Oxide.Plugins
 			["harbor_1_station"] = "Станция Моряков",
 			["harbor_2"] = "Порт",
 			["harbor_2_station"] = "Станция Моряков",
+			["jungle_ziggurat_a"] = "Зиккурат",
+            ["jungle_ziggurat_a_station"] = "Станция Зиккурат",
 			["junkyard_1"] = "Свалка",
 			["junkyard_1_station"] = "Станция Мусорщиков",
 			["launch_site_1"] = "Космодром",
@@ -374,6 +401,11 @@ namespace Oxide.Plugins
 			["power_sub_small_2"] = "Подстанция",
 			["power_sub_big_1"] = "Большая подстанция",
 			["power_sub_big_2"] = "Большая подстанция",
+			["jungle_ruins_a"] = "Руины",
+            ["jungle_ruins_b"] = "Руины",
+            ["jungle_ruins_c"] = "Руины",
+            ["jungle_ruins_d"] = "Руины",
+			["jungle_ruins_e"] = "Руины",
 			["water_well_a"] = "Колодец с водой",
 			["water_well_b"] = "Колодец с водой",
 			["water_well_c"] = "Колодец с водой",
@@ -403,7 +435,8 @@ namespace Oxide.Plugins
                 {
 					monumentKey = monument.transform.root.name.ToLower();
 					monumentKey = System.Text.RegularExpressions.Regex.Replace(monumentKey, @"[^\w\d]", string.Empty);
-					CreateCustomWatcher(monumentKey, monument.transform, prefab, monument.transform.root.name);
+					if (!string.IsNullOrWhiteSpace(monumentKey))
+						CreateCustomWatcher(monumentKey, monument.transform, prefab, monument.transform.root.name);
 					continue;
                 }
 				monumentKey = ClearMonumentName(prefab);
@@ -482,6 +515,13 @@ namespace Oxide.Plugins
 						power++;
 						CreateWatcher(monumentKey, MonumentCategory.PowerSubstation, monument.transform, prefab, $"_{power}", $"#{power}");
 						break;
+					case "jungle_ruins_a":
+                    case "jungle_ruins_b":
+                    case "jungle_ruins_c":
+                    case "jungle_ruins_d":
+					case "jungle_ruins_e":
+						CreateWatcher(monumentKey, MonumentCategory.Ruins, monument.transform, prefab);
+                        break;
 					case "water_well_a":
 					case "water_well_b":
 					case "water_well_c":
@@ -505,8 +545,7 @@ namespace Oxide.Plugins
 				var groundPos = new Vector3(station.transform.position.x, TerrainMeta.HeightMap.GetHeight(station.transform.position), station.transform.position.z);
 				foreach (var monument in _monumentsList.Values)
                 {
-					if (monument.Category != MonumentCategory.SafeZone && monument.Category != MonumentCategory.RadTown) continue;
-					if (Vector3.Distance(monument.boxCollider.ClosestPointOnBounds(groundPos), groundPos) <= stationDistance)
+					if ((monument.Category == MonumentCategory.SafeZone || monument.Category == MonumentCategory.RadTown) && Vector3.Distance(monument.boxCollider.ClosestPointOnBounds(groundPos), groundPos) <= stationDistance)
 						parentWatcher = monument;
                 }
 				
@@ -543,7 +582,7 @@ namespace Oxide.Plugins
 			watcher.InitializeBounds(_cargoBounds.CenterOffset, _cargoBounds.Size, Quaternion.identity, cargoShip.transform);
 			watcher.transform.parent = cargoShip.transform;
 			_monumentsList[monumentID] = watcher;
-			Interface.CallHook(Hooks_OnCargoWatcherCreated, monumentID, watcher.CategoryString);
+			Interface.CallHook(Hooks_OnCargoWatcherCreated, monumentID, watcher.CategoryString, cargoShip);
 		}
 		
 		private void CreateCustomWatcher(string monumentID, Transform transform, string prefab, string displayName)
@@ -600,14 +639,14 @@ namespace Oxide.Plugins
             _entitiesInMonuments.Clear();
 		}
 		
-		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey = "en")
+		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey)
 		{
 			var existFile = lang.GetMessages(langKey, this);
 			if (existFile == null || !existFile.Any())
 			{
 				if (!Directory.Exists(Path.Combine(Interface.Oxide.LangDirectory, langKey)))
 					Directory.CreateDirectory(Path.Combine(Interface.Oxide.LangDirectory, langKey));
-				File.WriteAllText(Path.Combine(Interface.Oxide.LangDirectory, $"{langKey}{Path.DirectorySeparatorChar}{this.Name}.json"), JsonConvert.SerializeObject(langFile, Formatting.Indented));
+				File.WriteAllText(Path.Combine(Interface.Oxide.LangDirectory, $"{langKey}{Path.DirectorySeparatorChar}{Name}.json"), JsonConvert.SerializeObject(langFile, Formatting.Indented));
 			}
 			lang.RegisterMessages(langFile, this, langKey);
 		}
@@ -681,6 +720,7 @@ namespace Oxide.Plugins
 								player.SendConsoleCommand("ddraw.line", duration, Color.red, startPos, endPos);
 						}
                     }
+					player.AddPingAtLocation(BasePlayer.PingType.GoTo, watcher.transform.position + watcher.transform.up * 2.5f, duration, new NetworkableId());
 				}
                 catch {}
                 finally
@@ -714,10 +754,12 @@ namespace Oxide.Plugins
             else
                 player.Reply(message);
         }
-        #endregion
+		
+		public static string ToLangKey(string langKey) => string.IsNullOrWhiteSpace(langKey) || langKey.Length != 2 || !langKey.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z') ? "en" : langKey.ToLower(System.Globalization.CultureInfo.InvariantCulture);
+		#endregion
 
         #region ~API~
-		private string[] GetAllMonuments() => _monumentsList.Keys.ToArray();
+        private string[] GetAllMonuments() => _monumentsList.Keys.ToArray();
 		private Dictionary<string, string> GetAllMonumentsCategories() => _monumentsList.ToDictionary(watcher => watcher.Key, watcher => watcher.Value.CategoryString);
 		private string[] GetMonumentsByCategory(string category) => _monumentsList.Where(watcher => watcher.Value.CategoryString.Equals(category, StringComparison.OrdinalIgnoreCase)).Select(watcher => watcher.Key).ToArray();
 		private string GetMonumentCategory(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.CategoryString : string.Empty;
@@ -955,7 +997,7 @@ namespace Oxide.Plugins
 			_playersInMonuments = new Hash<ulong, List<MonumentWatcher>>();
 			_npcsInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
 			_entitiesInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
-			string path = $@"MonumentsWatcher{Path.DirectorySeparatorChar}{{0}}";
+			string path = $"MonumentsWatcher{Path.DirectorySeparatorChar}{{0}}";
 			_defaultBoundsPath = string.Format(path, "DefaultBounds");
             _monumentsBoundsPath = string.Format(path, "MonumentsBounds");
             _customMonumentsBoundsPath = string.Format(path, "CustomMonumentsBounds");
@@ -981,9 +1023,10 @@ namespace Oxide.Plugins
 				SaveConfig();
             }
 			InitMonuments();
-			HandleLanguageFile(_enLang);
-			_enLang.Clear();
+			for (int i = 0; i < _config.LanguageKeys.Count; i++)
+				HandleLanguageFile(_enLang, _config.LanguageKeys[i]);
 			HandleLanguageFile(_ruLang, "ru");
+			_enLang.Clear();
 			_ruLang.Clear();
 			Interface.CallHook(Hooks_OnLoaded, Version);
 		}
@@ -1036,7 +1079,7 @@ namespace Oxide.Plugins
                 {
                     foreach (var watcher2 in _monumentsList.Values)
                     {
-                        if (watcher2.LangKey == args[1] && !monumentsList.Contains(watcher2))
+                        if (watcher2.LangKey.Contains(args[1], StringComparison.OrdinalIgnoreCase) && !monumentsList.Contains(watcher2))
                             monumentsList.Add(watcher2);
                     }
                 }
@@ -1053,9 +1096,9 @@ namespace Oxide.Plugins
 						SendMessage(player, string.Format(lang.GetMessage("CmdMainShow", this, player.Id), GetMonumentDisplayName(watcher.ID, player.Id), watcher.transform.position), false);
 					}
 					else
-					{
-                        foreach (var watcher in monumentsList)
-                            ShowBounds(watcher, bPlayer, displayTime);
+                    {
+						for (int i = 0; i < total; i++)
+							ShowBounds(monumentsList[i], bPlayer, displayTime);
                         SendMessage(player, string.Format(lang.GetMessage("CmdMainShowList", this, player.Id), args[1], total), false);
                     }
 				}
@@ -1191,88 +1234,95 @@ namespace Oxide.Plugins
 			
 			var initialBounds = new Hash<string, BoundsValues>()
 			{
-				{ Str_CargoShip, new BoundsValues(new Vector3(0, 17, 10), new Vector3(26, 60, 147)) },
-				{ "airfield_1", new BoundsValues(new Vector3(0, 15, -25), new Vector3(360, 60, 210)) },
-				{ "arctic_research_base_a", new BoundsValues(new Vector3(-2, 15, -2), new Vector3(120, 40, 115)) },
-				{ "bandit_town", new BoundsValues(new Vector3(0, 15, -5), new Vector3(160, 45, 160)) },
-				{ "compound", new BoundsValues(new Vector3(0, 15, 0), new Vector3(180, 60, 200)) },
-				{ "desert_military_base_a", new BoundsValues(new Vector3(0, 20, 3), new Vector3(100, 45, 100)) },
-				{ "desert_military_base_b", new BoundsValues(new Vector3(0, 20, 3), new Vector3(100, 45, 100)) },
-				{ "desert_military_base_c", new BoundsValues(new Vector3(0, 20, 3), new Vector3(100, 45, 100)) },
-				{ "desert_military_base_d", new BoundsValues(new Vector3(0, 20, 3), new Vector3(100, 45, 100)) },
-				{ "excavator_1", new BoundsValues(new Vector3(20, 35, -23), new Vector3(245, 100, 245)) },
-				{ "ferry_terminal_1", new BoundsValues(new Vector3(4, 12, 18), new Vector3(215, 45, 205)) },
-				{ "fishing_village_a", new BoundsValues(new Vector3(-2, 5, 0), new Vector3(85, 40, 90)) },
-				{ "fishing_village_b", new BoundsValues(new Vector3(-3, 5, 4), new Vector3(60, 40, 90)) },
-				{ "fishing_village_c", new BoundsValues(new Vector3(-3, 5, 4), new Vector3(60, 40, 90)) },
-				{ "gas_station_1", new BoundsValues(new Vector3(0, 10, 14), new Vector3(70, 30, 60)) },
-				{ "harbor_1", new BoundsValues(new Vector3(0, 20, 42), new Vector3(235, 60, 265)) },
-				{ "harbor_1_old", new BoundsValues(new Vector3(0, 20, 15), new Vector3(235, 60, 210)) },
-				{ "harbor_2", new BoundsValues(new Vector3(20, 20, 12), new Vector3(230, 60, 260)) },
-				{ "harbor_2_old", new BoundsValues(new Vector3(10, 20, 15), new Vector3(220, 60, 250)) },
-				{ "junkyard_1", new BoundsValues(new Vector3(0, 15, 10), new Vector3(180, 40, 180)) },
-				{ "launch_site_1", new BoundsValues(new Vector3(10, 28, -25), new Vector3(555, 125, 290)) },
-				{ "lighthouse", new BoundsValues(new Vector3(8, 35, 2), new Vector3(60, 80, 60)) },
-				{ "military_tunnel_1", new BoundsValues(new Vector3(0, 20, -20), new Vector3(270, 85, 245)) },
-				{ "mining_quarry_a", new BoundsValues(new Vector3(0, 10, 0), new Vector3(65, 25, 75)) },
-				{ "mining_quarry_b", new BoundsValues(new Vector3(-5, 10, -2), new Vector3(65, 25, 60)) },
-				{ "mining_quarry_c", new BoundsValues(new Vector3(-5, 10, 5), new Vector3(50, 25, 65)) },
-				{ "nuclear_missile_silo", new BoundsValues(new Vector3(10, 15, 0), new Vector3(140, 100, 120)) },
-				{ "oilrig_1", new BoundsValues(new Vector3(3, 30, 12), new Vector3(85, 110, 120)) },
-				{ "oilrig_2", new BoundsValues(new Vector3(18, 15, -2), new Vector3(75, 80, 85)) },
-				{ "powerplant_1", new BoundsValues(new Vector3(-15, 30, -13), new Vector3(220, 75, 300)) },
-				{ "radtown_1", new BoundsValues(new Vector3(2.75f, 7.5f, 0.5f), new Vector3(125, 20, 80)) },
-				{ "radtown_small_3", new BoundsValues(new Vector3(0, 20, -13), new Vector3(150, 55, 150)) },
-				{ "satellite_dish", new BoundsValues(new Vector3(0, 25, 5), new Vector3(170, 60, 140)) },
-				{ "sphere_tank", new BoundsValues(new Vector3(0, 41, 5), new Vector3(110, 85, 110)) },
-				{ "stables_a", new BoundsValues(new Vector3(5, 15, -3), new Vector3(70, 30, 80)) },
-				{ "stables_b", new BoundsValues(new Vector3(8, 15, 8), new Vector3(85, 30, 80)) },
-				{ "station-sn-0", new BoundsValues(new Vector3(0, 8, 0), new Vector3(105, 18, 215)) },
-				{ "station-sn-1", new BoundsValues(new Vector3(0, 8, 0), new Vector3(105, 18, 215)) },
-				{ "station-sn-2", new BoundsValues(new Vector3(0, 8, 0), new Vector3(105, 18, 215)) },
-				{ "station-sn-3", new BoundsValues(new Vector3(0, 8, 0), new Vector3(105, 18, 215)) },
-				{ "station-we-0", new BoundsValues(new Vector3(0, 8, 0), new Vector3(215, 18, 105)) },
-				{ "station-we-1", new BoundsValues(new Vector3(0, 8, 0), new Vector3(215, 18, 105)) },
-				{ "station-we-2", new BoundsValues(new Vector3(0, 8, 0), new Vector3(215, 18, 105)) },
-				{ "station-we-3", new BoundsValues(new Vector3(0, 8, 0), new Vector3(215, 18, 105)) },
-				{ "supermarket_1", new BoundsValues(new Vector3(2, 5, 0), new Vector3(50, 15, 50)) },
-				{ "swamp_a", new BoundsValues(new Vector3(-11, 15, 3), new Vector3(160, 35, 190)) },
-				{ "swamp_b", new BoundsValues(new Vector3(-1, 15, -3), new Vector3(125, 35, 125)) },
-				{ "swamp_c", new BoundsValues(new Vector3(6, 15, -1), new Vector3(130, 35, 130)) },
-				{ "trainyard_1", new BoundsValues(new Vector3(5, 25, -5), new Vector3(250, 80, 230)) },
-				{ "underwater_lab_a", new BoundsValues(new Vector3(0, 15, 0), new Vector3(110, 25, 110)) },
-				{ "underwater_lab_b", new BoundsValues(new Vector3(0, 15, 0), new Vector3(110, 25, 110)) },
-				{ "underwater_lab_c", new BoundsValues(new Vector3(0, 15, 0), new Vector3(110, 25, 110)) },
-				{ "underwater_lab_d", new BoundsValues(new Vector3(0, 15, 0), new Vector3(110, 25, 110)) },
-				{ "warehouse", new BoundsValues(new Vector3(0, 5, -7), new Vector3(45, 15, 30)) },
-				{ "water_treatment_plant_1", new BoundsValues(new Vector3(0, 30, -30), new Vector3(250, 90, 290)) },
-				{ "entrance_bunker_a", new BoundsValues(new Vector3(-4, 1, -1), new Vector3(20, 30, 20)) },
-				{ "entrance_bunker_b", new BoundsValues(new Vector3(-8, 1, 0), new Vector3(30, 30, 20)) },
-				{ "entrance_bunker_c", new BoundsValues(new Vector3(-4, 1, -1), new Vector3(20, 30, 20)) },
-				{ "entrance_bunker_d", new BoundsValues(new Vector3(-4, 1, -1), new Vector3(20, 30, 20)) },
-				{ "cave_small_easy", new BoundsValues(new Vector3(6, -28, 17), new Vector3(45, 46, 66)) },
-				{ "cave_small_medium", new BoundsValues(new Vector3(20, -30, -18), new Vector3(80, 50, 65)) },
-				{ "cave_small_hard", new BoundsValues(new Vector3(8, -21, 0), new Vector3(45, 35, 80)) },
-				{ "cave_medium_easy", new BoundsValues(new Vector3(8, -21, 0), new Vector3(45, 35, 80)) },
-				{ "cave_medium_medium", new BoundsValues(new Vector3(-1, -25, 2), new Vector3(110, 50, 110)) },
-				{ "cave_medium_hard", new BoundsValues(new Vector3(8, -21, 0), new Vector3(45, 35, 80)) },
-				{ "cave_large_medium", new BoundsValues(new Vector3(8, -21, 0), new Vector3(45, 35, 80)) },
-				{ "cave_large_hard", new BoundsValues(new Vector3(8, -21, 0), new Vector3(45, 35, 80)) },
-				{ "cave_large_sewers_hard", new BoundsValues(new Vector3(50, -25, -7), new Vector3(170, 40, 165)) },
-				{ "ice_lake_1", new BoundsValues(new Vector3(-2, 15, 0), new Vector3(140, 35, 160)) },
-				{ "ice_lake_2", new BoundsValues(new Vector3(0, 15, 0), new Vector3(150, 35, 150)) },
-				{ "ice_lake_3", new BoundsValues(new Vector3(0, 15, 0), new Vector3(180, 35, 240)) },
-				{ "ice_lake_4", new BoundsValues(new Vector3(0, 15, 0), new Vector3(85, 35, 85)) },
-				{ "power_sub_small_1", new BoundsValues(new Vector3(0, 5, 0), new Vector3(15, 10, 15)) },
-				{ "power_sub_small_2", new BoundsValues(new Vector3(0, 5, 0), new Vector3(15, 10, 15)) },
-				{ "power_sub_big_1", new BoundsValues(new Vector3(0, 5, 1), new Vector3(20, 10, 22)) },
-				{ "power_sub_big_2", new BoundsValues(new Vector3(-1, 5, 1), new Vector3(23, 10, 22)) },
-				{ "water_well_a", new BoundsValues(new Vector3(-2, 7, 0), new Vector3(25, 20, 25)) },
-				{ "water_well_b", new BoundsValues(new Vector3(-1, 7, 0), new Vector3(25, 20, 25)) },
-				{ "water_well_c", new BoundsValues(new Vector3(0, 10, 1), new Vector3(30, 25, 30)) },
-				{ "water_well_d", new BoundsValues(new Vector3(0, 10, 1), new Vector3(30, 25, 30)) },
-				{ "water_well_e", new BoundsValues(new Vector3(-1, 7, 0), new Vector3(25, 20, 25)) },
-				{ "monument_marker", new BoundsValues(new Vector3(0, 0, 0), new Vector3(100, 100, 100)) }
+				{ Str_CargoShip, new BoundsValues(new Vector3(0f, 17f, 10f), new Vector3(26f, 60f, 147f)) },
+				{ "airfield_1", new BoundsValues(new Vector3(0f, 20f, -25f), new Vector3(400f, 70f, 250f)) },
+				{ "arctic_research_base_a", new BoundsValues(new Vector3(-2f, 20f, -2f), new Vector3(180f, 70f, 180f)) },
+				{ "bandit_town", new BoundsValues(new Vector3(2.5f, 15f, 0f), new Vector3(220f, 70f, 180f)) },
+				{ "compound", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(180f, 60f, 200f)) },
+				{ "desert_military_base_a", new BoundsValues(new Vector3(0f, 15f, 3f), new Vector3(100f, 80f, 100f)) },
+				{ "desert_military_base_b", new BoundsValues(new Vector3(0f, 15f, 3f), new Vector3(160f, 80f, 160f)) },
+				{ "desert_military_base_c", new BoundsValues(new Vector3(0f, 15f, 18f), new Vector3(160f, 80f, 180f)) },
+				{ "desert_military_base_d", new BoundsValues(new Vector3(-5f, 15f, 0f), new Vector3(180f, 80f, 160f)) },
+				{ "excavator_1", new BoundsValues(new Vector3(20f, 40f, -23f), new Vector3(250f, 140f, 250f)) },
+				{ "ferry_terminal_1", new BoundsValues(new Vector3(4f, 15f, 25f), new Vector3(240f, 70f, 240f)) },
+				{ "fishing_village_a", new BoundsValues(new Vector3(-1.5f, 10f, -10f), new Vector3(120f, 60f, 120f)) },
+				{ "fishing_village_b", new BoundsValues(new Vector3(-3f, 10f, -4f), new Vector3(80f, 60f, 120f)) },
+				{ "fishing_village_c", new BoundsValues(new Vector3(-0.5f, 10f, -4f), new Vector3(80f, 60f, 120f)) },
+				{ "gas_station_1", new BoundsValues(new Vector3(0f, 15f, 14f), new Vector3(100f, 40f, 100f)) },
+				{ "harbor_1", new BoundsValues(new Vector3(5f, 25f, 42f), new Vector3(280f, 70f, 280f)) },
+				{ "harbor_1_old", new BoundsValues(new Vector3(0f, 20f, 15f), new Vector3(235f, 60f, 210f)) },
+				{ "harbor_2", new BoundsValues(new Vector3(25f, 25f, 5f), new Vector3(260f, 70f, 300f)) },
+				{ "harbor_2_old", new BoundsValues(new Vector3(10f, 20f, 15f), new Vector3(220f, 60f, 250f)) },
+				{ "jungle_ziggurat_a", new BoundsValues(new Vector3(0f, 10f, 0f), new Vector3(100f, 50f, 100f)) },
+				{ "junkyard_1", new BoundsValues(new Vector3(0f, 25f, 10f), new Vector3(200f, 60f, 200f)) },
+				{ "launch_site_1", new BoundsValues(new Vector3(0f, 35f, -25f), new Vector3(600f, 140f, 340f)) },
+				{ "lighthouse", new BoundsValues(new Vector3(8f, 35f, 2f), new Vector3(100f, 100f, 100f)) },
+				{ "military_tunnel_1", new BoundsValues(new Vector3(0f, 25f, 0f), new Vector3(300f, 100f, 300f)) },
+				{ "mining_quarry_a", new BoundsValues(new Vector3(2f, 15f, -5f), new Vector3(80f, 40f, 80f)) },
+				{ "mining_quarry_b", new BoundsValues(new Vector3(-5f, 15f, -2f), new Vector3(80f, 40f, 80f)) },
+				{ "mining_quarry_c", new BoundsValues(new Vector3(-6f, 15f, 0f), new Vector3(80f, 40f, 80f)) },
+				{ "nuclear_missile_silo", new BoundsValues(new Vector3(0f, 20f, 0f), new Vector3(180f, 120f, 180f)) },
+				{ "oilrig_1", new BoundsValues(new Vector3(3f, 25f, 12f), new Vector3(100f, 150f, 130f)) },
+				{ "oilrig_2", new BoundsValues(new Vector3(18f, 10f, -2f), new Vector3(100f, 120f, 100f)) },
+				{ "powerplant_1", new BoundsValues(new Vector3(-15f, 35f, -5f), new Vector3(260f, 100f, 300f)) },
+				{ "radtown_1", new BoundsValues(new Vector3(2.75f, 10f, 0.5f), new Vector3(160f, 40f, 120f)) },
+				{ "radtown_small_3", new BoundsValues(new Vector3(0f, 25f, -13f), new Vector3(200f, 70f, 200f)) },
+				{ "satellite_dish", new BoundsValues(new Vector3(0f, 30f, 5f), new Vector3(220f, 100f, 180f)) },
+				{ "sphere_tank", new BoundsValues(new Vector3(0f, 40f, 5f), new Vector3(150f, 110f, 150f)) },
+				{ "stables_a", new BoundsValues(new Vector3(0f, 20f, 5f), new Vector3(80f, 40f, 80f)) },
+				{ "stables_b", new BoundsValues(new Vector3(5f, 20f, 7.5f), new Vector3(100f, 40f, 100f)) },
+				{ "station-sn-0", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(105f, 18f, 215f)) },
+				{ "station-sn-1", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(105f, 18f, 215f)) },
+				{ "station-sn-2", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(105f, 18f, 215f)) },
+				{ "station-sn-3", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(105f, 18f, 215f)) },
+				{ "station-we-0", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(215f, 18f, 105f)) },
+				{ "station-we-1", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(215f, 18f, 105f)) },
+				{ "station-we-2", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(215f, 18f, 105f)) },
+				{ "station-we-3", new BoundsValues(new Vector3(0f, 8f, 0f), new Vector3(215f, 18f, 105f)) },
+				{ "supermarket_1", new BoundsValues(new Vector3(2f, 10f, 0f), new Vector3(80f, 30f, 80f)) },
+				{ "swamp_a", new BoundsValues(new Vector3(-11f, 15f, 3f), new Vector3(160f, 40f, 190f)) },
+				{ "swamp_b", new BoundsValues(new Vector3(-1f, 15f, -3f), new Vector3(125f, 40f, 125f)) },
+				{ "swamp_c", new BoundsValues(new Vector3(6f, 15f, -1f), new Vector3(130f, 40f, 130f)) },
+                { "ue_jungle_swamp_a", new BoundsValues(new Vector3(0f, 10f, 0f), new Vector3(80f, 40f, 80f)) },
+				{ "trainyard_1", new BoundsValues(new Vector3(10f, 30f, -10f), new Vector3(280f, 100f, 250f)) },
+				{ "underwater_lab_a", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(110f, 25f, 110f)) },
+				{ "underwater_lab_b", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(110f, 25f, 110f)) },
+				{ "underwater_lab_c", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(110f, 25f, 110f)) },
+				{ "underwater_lab_d", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(110f, 25f, 110f)) },
+				{ "warehouse", new BoundsValues(new Vector3(0f, 10f, -7f), new Vector3(60f, 30f, 60f)) },
+				{ "water_treatment_plant_1", new BoundsValues(new Vector3(0f, 35f, -30f), new Vector3(280f, 100f, 320f)) },
+				{ "entrance_bunker_a", new BoundsValues(new Vector3(-4f, 1f, -1f), new Vector3(20f, 30f, 20f)) },
+				{ "entrance_bunker_b", new BoundsValues(new Vector3(-8f, 1f, 0f), new Vector3(30f, 30f, 20f)) },
+				{ "entrance_bunker_c", new BoundsValues(new Vector3(-4f, 1f, -1f), new Vector3(20f, 30f, 20f)) },
+				{ "entrance_bunker_d", new BoundsValues(new Vector3(-4f, 1f, -1f), new Vector3(20f, 30f, 20f)) },
+				{ "cave_small_easy", new BoundsValues(new Vector3(6f, -28f, 17f), new Vector3(45f, 46f, 66f)) },
+				{ "cave_small_medium", new BoundsValues(new Vector3(20f, -30f, -18f), new Vector3(80f, 50f, 65f)) },
+				{ "cave_small_hard", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
+				{ "cave_medium_easy", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
+				{ "cave_medium_medium", new BoundsValues(new Vector3(-1f, -25f, 2f), new Vector3(110f, 50f, 110f)) },
+				{ "cave_medium_hard", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
+				{ "cave_large_medium", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
+				{ "cave_large_hard", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
+				{ "cave_large_sewers_hard", new BoundsValues(new Vector3(50f, -25f, -7f), new Vector3(170f, 40f, 165f)) },
+				{ "ice_lake_1", new BoundsValues(new Vector3(-2f, 15f, 0f), new Vector3(140f, 35f, 160f)) },
+				{ "ice_lake_2", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(150f, 35f, 150f)) },
+				{ "ice_lake_3", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(180f, 35f, 240f)) },
+				{ "ice_lake_4", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(85f, 35f, 85f)) },
+				{ "power_sub_small_1", new BoundsValues(new Vector3(0f, 5f, 0f), new Vector3(15f, 10f, 15f)) },
+				{ "power_sub_small_2", new BoundsValues(new Vector3(0f, 5f, 0f), new Vector3(15f, 10f, 15f)) },
+				{ "power_sub_big_1", new BoundsValues(new Vector3(0f, 5f, 1f), new Vector3(20f, 10f, 22f)) },
+				{ "power_sub_big_2", new BoundsValues(new Vector3(-1f, 5f, 1f), new Vector3(23f, 10f, 22f)) },
+				{ "jungle_ruins_a", new BoundsValues(new Vector3(0f, 10f, 0.5f), new Vector3(30f, 30f, 50f)) },
+				{ "jungle_ruins_b", new BoundsValues(new Vector3(2.5f, 10f, 0f), new Vector3(40f, 30f, 40f)) },
+				{ "jungle_ruins_c", new BoundsValues(new Vector3(0f, 10f, -0.5f), new Vector3(40f, 30f, 40f)) },
+				{ "jungle_ruins_d", new BoundsValues(new Vector3(-1.5f, 10f, 5f), new Vector3(40f, 30f, 40f)) },
+				{ "jungle_ruins_e", new BoundsValues(new Vector3(-1.5f, 10f, 1f), new Vector3(40f, 30f, 40f)) },
+				{ "water_well_a", new BoundsValues(new Vector3(-2f, 7f, 0f), new Vector3(25f, 20f, 25f)) },
+				{ "water_well_b", new BoundsValues(new Vector3(-1f, 7f, 0f), new Vector3(25f, 20f, 25f)) },
+				{ "water_well_c", new BoundsValues(new Vector3(0f, 10f, 1f), new Vector3(32f, 25f, 32f)) },
+				{ "water_well_d", new BoundsValues(new Vector3(0f, 10f, 1f), new Vector3(30f, 25f, 30f)) },
+				{ "water_well_e", new BoundsValues(new Vector3(-1f, 7f, 0f), new Vector3(25f, 20f, 25f)) },
+				{ "monument_marker", new BoundsValues(new Vector3(0f, 0f, 0f), new Vector3(100f, 100f, 100f)) }
 			};
 			
 			foreach (var kvp in initialBounds)
@@ -1319,7 +1369,8 @@ namespace Oxide.Plugins
             Swamp,
             IceLake,
             PowerSubstation,
-            WaterWell,
+			Ruins,
+			WaterWell,
             Custom
         }
 		
