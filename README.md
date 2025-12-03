@@ -21,9 +21,9 @@ The list of all monuments can be viewed in the:
 
 ## Donations  
 
-- **USDT TRC20:** `TLN9Tsrdmt96yFCXZTfh4NLtyzWYGkqTA3`  
-- **USDT TON:** `UQDma5Ovkk7M9Qve-4P2njmrgSXZQdACU0gLCGNEgkXDlngn`  
-- **TON:** `UQDma5Ovkk7M9Qve-4P2njmrgSXZQdACU0gLCGNEgkXDlngn`  
+- **USDT TRC20:** `TGd19rg8amSDvspnMLyAcGiquNGMoC73SH`  
+- **USDT TON:** `UQAcBjQGjTNXCmrOAm5fJDL0fBgnASsnni7_jSIAix2METXp`  
+- **TON:** `UQAcBjQGjTNXCmrOAm5fJDL0fBgnASsnni7_jSIAix2METXp`  
 
 ## Features  
 
@@ -53,7 +53,7 @@ The list of all monuments can be viewed in the:
   "Version": {
     "Major": 0,
     "Minor": 1,
-    "Patch": 8
+    "Patch": 9
   }
 }
 ```  

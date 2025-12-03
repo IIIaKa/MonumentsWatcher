@@ -45,24 +45,25 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-	[Info("Monuments Watcher", "IIIaKa", "0.1.8")]
+	[Info("Monuments Watcher", "IIIaKa", "0.1.9")]
 	[Description("A plugin that allows other plugins to interact with players and entities in monuments via API.")]
 	class MonumentsWatcher : RustPlugin
     {
 		#region ~Variables~
         private static MonumentsWatcher Instance { get; set; }
-		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Leave = "leave", Str_Death = "death", Str_ClearList = "clearlist", Str_CargoShip = "CargoShip",
+		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
 			Hooks_OnLoaded = "OnMonumentsWatcherLoaded", Hooks_OnCargoWatcherCreated = "OnCargoWatcherCreated", Hooks_OnCargoWatcherDeleted = "OnCargoWatcherDeleted",
+			Hooks_OnSpawnableWatcherCreated = "OnSpawnableWatcherCreated", Hooks_OnSpawnableWatcherDeleted = "OnSpawnableWatcherDeleted",
 			Hooks_OnPlayerEnteredMonument = "OnPlayerEnteredMonument", Hooks_OnNpcEnteredMonument = "OnNpcEnteredMonument", Hooks_OnEntityEnteredMonument = "OnEntityEnteredMonument",
 			Hooks_OnPlayerExitedMonument = "OnPlayerExitedMonument", Hooks_OnNpcExitedMonument = "OnNpcExitedMonument", Hooks_OnEntityExitedMonument = "OnEntityExitedMonument";
         private static Hash<string, MonumentWatcher> _monumentsList;
 		private static Hash<ulong, List<MonumentWatcher>> _playersInMonuments;
         private static Hash<NetworkableId, List<MonumentWatcher>> _npcsInMonuments, _entitiesInMonuments;
-        private BoundsValues _cargoBounds;
+		private string[] _defaultHooks = new string[] { "OnEntitySpawned", "OnEntityDeath", "OnEntityKill", "OnPlayerTeleported" };
 		#endregion
 
-		#region ~Configuration~
-		private static Configuration _config;
+        #region ~Configuration~
+        private static Configuration _config;
 		
 		private class Configuration
 		{
@@ -73,7 +74,7 @@ namespace Oxide.Plugins
 			public bool GameTips_Enabled = true;
 			
 			[JsonProperty(PropertyName = "List of language keys for creating language files")]
-            public List<string> LanguageKeys;
+			public List<string> LanguageKeys;
 			
 			[JsonProperty(PropertyName = "Is it worth recreating boundaries(excluding custom monuments) upon detecting a wipe?")]
 			public bool RecreateOnWipe = true;
@@ -107,8 +108,7 @@ namespace Oxide.Plugins
 			if (string.IsNullOrWhiteSpace(_config.Command))
 				_config.Command = "monument";
 			
-			if (_config.LanguageKeys == null)
-                _config.LanguageKeys = new List<string>();
+			_config.LanguageKeys ??= new List<string>();
             if (_config.LanguageKeys.Any())
             {
                 for (int i = _config.LanguageKeys.Count - 1; i >= 0; i--)
@@ -122,9 +122,7 @@ namespace Oxide.Plugins
             }
             _config.LanguageKeys.Add("en");
 			
-			if (_config.TrackedCategories == null)
-				_config.TrackedCategories = new HashSet<MonumentCategory>();
-			
+			_config.TrackedCategories ??= new HashSet<MonumentCategory>();
 			SaveConfig();
 		}
 		
@@ -166,6 +164,14 @@ namespace Oxide.Plugins
 			["bandit_town_station"] = "Bandit Station",
 			["compound"] = "Outpost",
 			["compound_station"] = "Outpost Station",
+			["deepsea_floatingcity1"] = "Floating City",
+            ["deepsea_floatingcity2"] = "Floating City",
+            ["deepsea_floatingcity3"] = "Floating City",
+			["deepsea_floatingcity4"] = "Floating City",
+			["deepsea_island_tropical1"] = "Tropical Island",
+            ["deepsea_island_tropical2"] = "Tropical Island",
+            ["deepsea_island_tropical3"] = "Tropical Island",
+            ["deepsea_island_tropical4"] = "Tropical Island",
 			["desert_military_base_a"] = "Abandoned Military Base",
 			["desert_military_base_a_station"] = "Dune Station",
 			["desert_military_base_b"] = "Abandoned Military Base",
@@ -185,6 +191,10 @@ namespace Oxide.Plugins
 			["fishing_village_c"] = "Fishing Village",
 			["fishing_village_c_station"] = "Fishing Station",
 			["gas_station_1"] = "Oxum's Gas Station",
+			["ghostship"] = "Ghost Ship",
+            ["ghostship_b"] = "Ghost Ship",
+            ["ghostship_c"] = "Ghost Ship",
+            ["ghostship_d"] = "Ghost Ship",
 			["harbor_1"] = "Large Harbor",
 			["harbor_1_station"] = "Large Harbor Station",
 			["harbor_2"] = "Small Harbor",
@@ -306,6 +316,14 @@ namespace Oxide.Plugins
 			["bandit_town_station"] = "Станция бандитов",
 			["compound"] = "Город",
 			["compound_station"] = "Станция Город",
+			["deepsea_floatingcity1"] = "Плавающий город",
+            ["deepsea_floatingcity2"] = "Плавающий город",
+            ["deepsea_floatingcity3"] = "Плавающий город",
+			["deepsea_floatingcity4"] = "Плавающий город",
+			["deepsea_island_tropical1"] = "Тропический остров",
+			["deepsea_island_tropical2"] = "Тропический остров",
+			["deepsea_island_tropical3"] = "Тропический остров",
+			["deepsea_island_tropical4"] = "Тропический остров",
 			["desert_military_base_a"] = "Заброшенная военная база",
 			["desert_military_base_a_station"] = "Станция Дюна",
 			["desert_military_base_b"] = "Заброшенная военная база",
@@ -325,6 +343,10 @@ namespace Oxide.Plugins
 			["fishing_village_c"] = "Рыбацкая деревня",
 			["fishing_village_c_station"] = "Станция Рыбаков",
 			["gas_station_1"] = "Заправка",
+			["ghostship"] = "Корабль призрак",
+			["ghostship_b"] = "Корабль призрак",
+			["ghostship_c"] = "Корабль призрак",
+			["ghostship_d"] = "Корабль призрак",
 			["harbor_1"] = "Большой порт",
 			["harbor_1_station"] = "Станция Моряков",
 			["harbor_2"] = "Порт",
@@ -423,9 +445,16 @@ namespace Oxide.Plugins
 			ClearWatchers();
 			foreach (var entity in BaseNetworkable.serverEntities)
             {
+				if (!entity.IsValid()) continue;
 				if (entity is CargoShip cargoShip)
 					CreateCargoWatcher(cargoShip);
-            }
+				else if (entity is DeepSeaFloatingCity floatingCity)
+					CreateSpawnableWatcher(floatingCity, MonumentCategory.SafeZone);
+				else if (entity is DeepSeaIsland deepSeaIsland)
+					CreateSpawnableWatcher(deepSeaIsland, MonumentCategory.DeepSeaIsland);
+				else if (entity is Prefabs.Misc.GhostShip ghostShip)
+					CreateSpawnableWatcher(ghostShip, MonumentCategory.RadTownWater);
+			}
 			string monumentKey, prefab;
 			int miningoutpost = 0, lighthouse = 0, gasstation = 0, supermarket = 0, tunnel = 0, bunker = 0, cave = 0, icelake = 0, power = 0, waterwell = 0;
 			foreach (var monument in TerrainMeta.Path.Monuments)
@@ -440,7 +469,7 @@ namespace Oxide.Plugins
 					continue;
                 }
 				monumentKey = ClearMonumentName(prefab);
-				if (!_defaultBounds.ContainsKey(monumentKey)) continue;
+				if (!_defaultBoundsValues.ContainsKey(monumentKey)) continue;
 				if (monument.IsSafeZone)
                 {
 					CreateWatcher(monumentKey, MonumentCategory.SafeZone, monument.transform, prefab);
@@ -560,12 +589,10 @@ namespace Oxide.Plugins
 				tunnel++;
 				CreateWatcher(monumentKey, MonumentCategory.TunnelStation, station.transform, prefab, $"_{tunnel}", $"#{tunnel}");
 			}
-			Subscribe(nameof(OnEntitySpawned));
-			Subscribe(nameof(OnEntityDeath));
-			Subscribe(nameof(OnEntityKill));
-			Subscribe(nameof(OnPlayerTeleported));
 			
-			SaveBoundsConfig(_defaultBoundsPath, _defaultBounds);
+			for (int i = 0; i < _defaultHooks.Length; i++)
+				Subscribe(_defaultHooks[i]);
+			SaveBoundsConfig(_defaultBoundsPath, _defaultBoundsValues);
 			SaveBoundsConfig(_monumentsBoundsPath, _monumentsBounds);
 			SaveBoundsConfig(_customMonumentsBoundsPath, _customMonumentsBounds);
 			FreeBoundsConfig();
@@ -573,16 +600,30 @@ namespace Oxide.Plugins
 		
 		private void CreateCargoWatcher(CargoShip cargoShip)
         {
-			if (!cargoShip.IsValid() || (_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(MonumentCategory.RadTownWater))) return;
+			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(MonumentCategory.RadTownWater)) || !cargoShip.IsValid()) return;
 			ulong cargoID = cargoShip.net.ID.Value;
 			string monumentID = $"CargoShip_{cargoID}";
+			var bounds = _spawnableBoundsValues[Str_CargoShip];
 			
 			var watcher = new GameObject().gameObject.AddComponent<MonumentWatcher>();
-			watcher.InitializeProperties(monumentID, MonumentCategory.RadTownWater, cargoShip.name, Str_CargoShip, $"#{cargoID}");
-			watcher.InitializeBounds(_cargoBounds.CenterOffset, _cargoBounds.Size, Quaternion.identity, cargoShip.transform);
-			watcher.transform.parent = cargoShip.transform;
+			watcher.InitializeProperties(monumentID, MonumentCategory.RadTownWater, cargoShip.name, Str_CargoShip, $"#{cargoID}", parnetID: cargoID);
+			watcher.InitializeBounds(bounds.CenterOffset, bounds.Size, Quaternion.identity, cargoShip.transform);
 			_monumentsList[monumentID] = watcher;
 			Interface.CallHook(Hooks_OnCargoWatcherCreated, monumentID, watcher.CategoryString, cargoShip);
+		}
+		
+		private void CreateSpawnableWatcher(BaseEntity entity, MonumentCategory category)
+        {
+			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category)) || !entity.IsValid()) return;
+			ulong netID = entity.net.ID.Value;
+			string prefab = entity.name.ToLower(), monumentKey = ClearMonumentName(prefab), monumentID = $"{monumentKey}_{netID}";
+			var bounds = _spawnableBoundsValues[monumentKey];
+			
+			var watcher = new GameObject().gameObject.AddComponent<MonumentWatcher>();
+            watcher.InitializeProperties(monumentID, category, prefab, monumentKey, $"#{netID}", parnetID: netID);
+            watcher.InitializeBounds(entity.transform.position + (entity.transform.rotation * bounds.CenterOffset), bounds.Size, entity.transform.rotation);
+			_monumentsList[monumentID] = watcher;
+			Interface.CallHook(Hooks_OnSpawnableWatcherCreated, monumentID, watcher.CategoryString, entity);
 		}
 		
 		private void CreateCustomWatcher(string monumentID, Transform transform, string prefab, string displayName)
@@ -602,7 +643,7 @@ namespace Oxide.Plugins
                         break;
                     }
                 }
-                _customMonumentsBounds[monumentID] = bounds = new CustomMonumentBounds(_defaultBounds["monument_marker"], transform.position, rotation, MonumentCategory.Custom);
+                _customMonumentsBounds[monumentID] = bounds = new CustomMonumentBounds(_defaultBoundsValues["monument_marker"], transform.position, rotation, MonumentCategory.Custom);
             }
 			
 			if (bounds.MonumentCategory != MonumentCategory.Custom && _config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(bounds.MonumentCategory)) return;
@@ -617,7 +658,7 @@ namespace Oxide.Plugins
 			if (_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category)) return;
 			string monumentID = $"{monumentKey}{(!string.IsNullOrWhiteSpace(idSuffix) ? idSuffix : string.Empty)}";
 			if (!_monumentsBounds.TryGetValue(monumentID, out var bounds) || bounds == null)
-				_monumentsBounds[monumentID] = bounds = new MonumentBounds(_defaultBounds[monumentKey], transform.position, transform.rotation.eulerAngles);
+				_monumentsBounds[monumentID] = bounds = new MonumentBounds(_defaultBoundsValues[monumentKey], transform.position, transform.rotation.eulerAngles);
 			
 			var watcher = new GameObject().AddComponent<MonumentWatcher>();
 			watcher.InitializeProperties(monumentID, category, prefab, monumentKey, suffix);
@@ -627,16 +668,26 @@ namespace Oxide.Plugins
 		
 		private void ClearWatchers()
         {
-			Unsubscribe(nameof(OnEntitySpawned));
-			Unsubscribe(nameof(OnEntityDeath));
-			Unsubscribe(nameof(OnEntityKill));
-			Unsubscribe(nameof(OnPlayerTeleported));
+            for (int i = 0; i < _defaultHooks.Length; i++)
+                Unsubscribe(_defaultHooks[i]);
 			foreach (var watcher in _monumentsList.Values.ToArray())
-				UnityEngine.Object.DestroyImmediate(watcher.gameObject);
+				UnityEngine.Object.Destroy(watcher.gameObject);
 			_monumentsList.Clear();
 			_playersInMonuments.Clear();
             _npcsInMonuments.Clear();
             _entitiesInMonuments.Clear();
+		}
+		
+		private void TryDeleteWatcher(ulong parentID)
+        {
+			foreach (var watcher in _monumentsList.Values)
+            {
+                if (watcher.ParentID == parentID)
+                {
+                    UnityEngine.Object.Destroy(watcher.gameObject);
+                    return;
+                }
+            }
 		}
 		
 		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey)
@@ -675,60 +726,58 @@ namespace Oxide.Plugins
 		
 		private void ShowBounds(MonumentWatcher watcher, BasePlayer player, float duration = 20f)
         {
-            if (watcher != null && player != null)
+			if (watcher == null || player == null) return;
+            bool isAdmin = player.IsAdmin;
+            try
             {
-                bool isAdmin = player.IsAdmin;
-                try
-                {
-                    if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, true);
-					
-					//TEXT
-                    player.SendConsoleCommand("ddraw.text", duration, Color.magenta, watcher.transform.position, watcher.ID);
-					
-					//CENTER
-                    player.SendConsoleCommand("ddraw.sphere", duration, Color.green, watcher.transform.position, 1f);
+                if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, true);
 
-                    //CORNERS
-					Vector3 size = watcher.boxCollider.size * 0.5f,
-						center = watcher.boxCollider.center;
-					var transform = watcher.boxCollider.transform;
-					Vector3[] corners = new Vector3[8],
-                        offsets = new Vector3[8]
-                        {
-                            new Vector3(-size.x, -size.y, -size.z),
-                            new Vector3(size.x, -size.y, -size.z),
-                            new Vector3(size.x, -size.y, size.z),
-                            new Vector3(-size.x, -size.y, size.z),
-                            new Vector3(-size.x, size.y, -size.z),
-                            new Vector3(size.x, size.y, -size.z),
-                            new Vector3(size.x, size.y, size.z),
-                            new Vector3(-size.x, size.y, size.z)
-                        };
-					for (int i = 0; i < offsets.Length; i++)
-					{
-						var corner = corners[i] = transform.TransformPoint(center + offsets[i]);
-						player.SendConsoleCommand("ddraw.sphere", duration, Color.red, corner, 1f);
-					}
-					
-					//LINES
-                    for (int i = 0; i < corners.Length; i++)
+                //TEXT
+                player.SendConsoleCommand("ddraw.text", duration, Color.magenta, watcher.transform.position, watcher.ID);
+
+                //CENTER
+                player.SendConsoleCommand("ddraw.sphere", duration, Color.green, watcher.transform.position, 1f);
+
+                //CORNERS
+                Vector3 size = watcher.boxCollider.size * 0.5f,
+                    center = watcher.boxCollider.center;
+                var transform = watcher.boxCollider.transform;
+                Vector3[] corners = new Vector3[8],
+                    offsets = new Vector3[8]
                     {
-						var startPos = corners[i];
-						foreach (var endPos in corners)
-						{
-							if (endPos != startPos)
-								player.SendConsoleCommand("ddraw.line", duration, Color.red, startPos, endPos);
-						}
-                    }
-					player.AddPingAtLocation(BasePlayer.PingType.GoTo, watcher.transform.position + watcher.transform.up * 2.5f, duration, new NetworkableId());
-				}
-                catch {}
-                finally
+                        new (-size.x, -size.y, -size.z),
+                        new (size.x, -size.y, -size.z),
+                        new (size.x, -size.y, size.z),
+                        new (-size.x, -size.y, size.z),
+                        new (-size.x, size.y, -size.z),
+                        new (size.x, size.y, -size.z),
+                        new (size.x, size.y, size.z),
+                        new (-size.x, size.y, size.z)
+                    };
+                for (int i = 0; i < offsets.Length; i++)
                 {
-                    if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, false);
+                    var corner = corners[i] = transform.TransformPoint(center + offsets[i]);
+                    player.SendConsoleCommand("ddraw.sphere", duration, Color.red, corner, 1f);
                 }
+
+                //LINES
+                for (int i = 0; i < corners.Length; i++)
+                {
+                    var startPos = corners[i];
+                    foreach (var endPos in corners)
+                    {
+                        if (endPos != startPos)
+                            player.SendConsoleCommand("ddraw.line", duration, Color.red, startPos, endPos);
+                    }
+                }
+                player.AddPingAtLocation(BasePlayer.PingType.GoTo, watcher.transform.position + watcher.transform.up * 2.5f, duration, new NetworkableId());
             }
-        }
+            catch {}
+            finally
+            {
+                if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, false);
+            }
+		}
 		
 		private void UpdateFlag(BasePlayer player, BasePlayer.PlayerFlags flag, bool addFlag)
 		{
@@ -943,6 +992,27 @@ namespace Oxide.Plugins
 		
 		#region ~Oxide Hooks~
         void OnEntitySpawned(CargoShip cargoShip) => CreateCargoWatcher(cargoShip);
+		void OnEntitySpawned(DeepSeaFloatingCity floatingCity) => CreateSpawnableWatcher(floatingCity, MonumentCategory.SafeZone);
+		void OnEntitySpawned(DeepSeaIsland deepSeaIsland) => CreateSpawnableWatcher(deepSeaIsland, MonumentCategory.DeepSeaIsland);
+		void OnEntitySpawned(Prefabs.Misc.GhostShip ghostShip) => CreateSpawnableWatcher(ghostShip, MonumentCategory.RadTownWater);
+		
+		void OnEntityKill(DeepSeaFloatingCity floatingCity)
+        {
+			if ((!_config.TrackedCategories.Any() || _config.TrackedCategories.Contains(MonumentCategory.SafeZone)) && floatingCity.IsValid())
+				TryDeleteWatcher(floatingCity.net.ID.Value);
+		}
+		
+		void OnEntityKill(DeepSeaIsland deepSeaIsland)
+        {
+			if ((!_config.TrackedCategories.Any() || _config.TrackedCategories.Contains(MonumentCategory.DeepSeaIsland)) && deepSeaIsland.IsValid())
+                TryDeleteWatcher(deepSeaIsland.net.ID.Value);
+        }
+		
+		void OnEntityKill(Prefabs.Misc.GhostShip ghostShip)
+        {
+            if ((!_config.TrackedCategories.Any() || _config.TrackedCategories.Contains(MonumentCategory.RadTownWater)) && ghostShip.IsValid())
+                TryDeleteWatcher(ghostShip.net.ID.Value);
+        }
 		
 		void OnEntityDeath(BasePlayer player)
 		{
@@ -986,10 +1056,8 @@ namespace Oxide.Plugins
 		
 		void Init()
         {
-			Unsubscribe(nameof(OnEntitySpawned));
-			Unsubscribe(nameof(OnEntityDeath));
-			Unsubscribe(nameof(OnEntityKill));
-			Unsubscribe(nameof(OnPlayerTeleported));
+			for (int i = 0; i < _defaultHooks.Length; i++)
+				Unsubscribe(_defaultHooks[i]);
 			Instance = this;
 			permission.RegisterPermission(PERMISSION_ADMIN, this);
 			AddCovalenceCommand(_config.Command, nameof(MonumentsWatcher_Command));
@@ -997,20 +1065,14 @@ namespace Oxide.Plugins
 			_playersInMonuments = new Hash<ulong, List<MonumentWatcher>>();
 			_npcsInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
 			_entitiesInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
-			string path = $"MonumentsWatcher{Path.DirectorySeparatorChar}{{0}}";
-			_defaultBoundsPath = string.Format(path, "DefaultBounds");
-            _monumentsBoundsPath = string.Format(path, "MonumentsBounds");
-            _customMonumentsBoundsPath = string.Format(path, "CustomMonumentsBounds");
+			string path = $"MonumentsWatcher{Path.DirectorySeparatorChar}";
+			_defaultBoundsPath = $"{path}DefaultBounds";
+			_monumentsBoundsPath = $"{path}MonumentsBounds";
+            _customMonumentsBoundsPath = $"{path}CustomMonumentsBounds";
 		}
 		
 		void OnServerInitialized(bool initial)
         {
-			if (initial)
-            {
-                Interface.Oxide.ReloadPlugin(Name);
-                return;
-            }
-			
 			if (string.IsNullOrWhiteSpace(_config.WipeID) || _config.WipeID != SaveRestore.WipeId)
 			{
 				_config.WipeID = SaveRestore.WipeId;
@@ -1028,7 +1090,7 @@ namespace Oxide.Plugins
 			HandleLanguageFile(_ruLang, "ru");
 			_enLang.Clear();
 			_ruLang.Clear();
-			Interface.CallHook(Hooks_OnLoaded, Version);
+			timer.Once(1f, () => Interface.CallHook(Hooks_OnLoaded, Version));
 		}
 		
 		void Unload()
@@ -1038,9 +1100,6 @@ namespace Oxide.Plugins
 			_playersInMonuments = null;
 			_npcsInMonuments = null;
 			_entitiesInMonuments = null;
-			_defaultBounds = null;
-			_monumentsBounds = null;
-			_customMonumentsBounds = null;
 			Instance = null;
 			_config = null;
 		}
@@ -1221,17 +1280,13 @@ namespace Oxide.Plugins
 			}
 		}
 		
-		private static Hash<string, BoundsValues> _defaultBounds;
-        private static Hash<string, MonumentBounds> _monumentsBounds;
-        private static Hash<string, CustomMonumentBounds> _customMonumentsBounds;
+		private Hash<string, BoundsValues> _defaultBoundsValues, _spawnableBoundsValues;
+        private Hash<string, MonumentBounds> _monumentsBounds;
+        private Hash<string, CustomMonumentBounds> _customMonumentsBounds;
         private string _defaultBoundsPath = string.Empty, _monumentsBoundsPath = string.Empty, _customMonumentsBoundsPath = string.Empty;
 		
 		private void LoadDefaultBounds()
         {
-			LoadBoundsConfig(_defaultBoundsPath, out _defaultBounds);
-			if (_defaultBounds == null)
-				_defaultBounds = new Hash<string, BoundsValues>();
-			
 			var initialBounds = new Hash<string, BoundsValues>()
 			{
 				{ Str_CargoShip, new BoundsValues(new Vector3(0f, 17f, 10f), new Vector3(26f, 60f, 147f)) },
@@ -1239,6 +1294,14 @@ namespace Oxide.Plugins
 				{ "arctic_research_base_a", new BoundsValues(new Vector3(-2f, 20f, -2f), new Vector3(180f, 70f, 180f)) },
 				{ "bandit_town", new BoundsValues(new Vector3(2.5f, 15f, 0f), new Vector3(220f, 70f, 180f)) },
 				{ "compound", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(180f, 60f, 200f)) },
+				{ "deepsea_floatingcity1", new BoundsValues(new Vector3(-5f, 40f, -30f), new Vector3(250f, 150f, 280f)) },
+				{ "deepsea_floatingcity2", new BoundsValues(new Vector3(-10f, 40f, 15f), new Vector3(220f, 150f, 280f)) },
+				{ "deepsea_floatingcity3", new BoundsValues(new Vector3(22.5f, 40f, -40f), new Vector3(300f, 150f, 220f)) },
+				{ "deepsea_floatingcity4", new BoundsValues(new Vector3(-2f, 40f, 7f), new Vector3(250f, 150f, 250f)) },
+				{ "deepsea_island_tropical1", new BoundsValues(new Vector3(-5f, 15f, 55f), new Vector3(300f, 120f, 250f)) },
+				{ "deepsea_island_tropical2", new BoundsValues(new Vector3(35f, 15f, -80f), new Vector3(3300f, 120f, 300f)) },
+				{ "deepsea_island_tropical3", new BoundsValues(new Vector3(-15f, 15f, 30f), new Vector3(200f, 120f, 160f)) },
+				{ "deepsea_island_tropical4", new BoundsValues(new Vector3(-25f, 15f, 10f), new Vector3(260f, 120f, 300f)) },
 				{ "desert_military_base_a", new BoundsValues(new Vector3(0f, 15f, 3f), new Vector3(100f, 80f, 100f)) },
 				{ "desert_military_base_b", new BoundsValues(new Vector3(0f, 15f, 3f), new Vector3(160f, 80f, 160f)) },
 				{ "desert_military_base_c", new BoundsValues(new Vector3(0f, 15f, 18f), new Vector3(160f, 80f, 180f)) },
@@ -1249,6 +1312,10 @@ namespace Oxide.Plugins
 				{ "fishing_village_b", new BoundsValues(new Vector3(-3f, 10f, -4f), new Vector3(80f, 60f, 120f)) },
 				{ "fishing_village_c", new BoundsValues(new Vector3(-0.5f, 10f, -4f), new Vector3(80f, 60f, 120f)) },
 				{ "gas_station_1", new BoundsValues(new Vector3(0f, 15f, 14f), new Vector3(100f, 40f, 100f)) },
+				{ "ghostship", new BoundsValues(new Vector3(0f, 17.5f, 0f), new Vector3(120f, 60f, 80f)) },
+				{ "ghostship_b", new BoundsValues(new Vector3(0f, 17.5f, 0f), new Vector3(120f, 60f, 80f)) },
+				{ "ghostship_c", new BoundsValues(new Vector3(0f, 17.5f, 0f), new Vector3(120f, 60f, 80f)) },
+				{ "ghostship_d", new BoundsValues(new Vector3(0f, 17.5f, 0f), new Vector3(120f, 60f, 80f)) },
 				{ "harbor_1", new BoundsValues(new Vector3(5f, 25f, 42f), new Vector3(280f, 70f, 280f)) },
 				{ "harbor_1_old", new BoundsValues(new Vector3(0f, 20f, 15f), new Vector3(235f, 60f, 210f)) },
 				{ "harbor_2", new BoundsValues(new Vector3(25f, 25f, 5f), new Vector3(260f, 70f, 300f)) },
@@ -1259,7 +1326,7 @@ namespace Oxide.Plugins
 				{ "lighthouse", new BoundsValues(new Vector3(8f, 35f, 2f), new Vector3(100f, 100f, 100f)) },
 				{ "military_tunnel_1", new BoundsValues(new Vector3(0f, 25f, 0f), new Vector3(300f, 100f, 300f)) },
 				{ "mining_quarry_a", new BoundsValues(new Vector3(2f, 15f, -5f), new Vector3(80f, 40f, 80f)) },
-				{ "mining_quarry_b", new BoundsValues(new Vector3(-5f, 15f, -2f), new Vector3(80f, 40f, 80f)) },
+				{ "mining_quarry_b", new BoundsValues(new Vector3(-5f, 15f, -7f), new Vector3(100f, 40f, 90f)) },
 				{ "mining_quarry_c", new BoundsValues(new Vector3(-6f, 15f, 0f), new Vector3(80f, 40f, 80f)) },
 				{ "nuclear_missile_silo", new BoundsValues(new Vector3(0f, 20f, 0f), new Vector3(180f, 120f, 180f)) },
 				{ "oilrig_1", new BoundsValues(new Vector3(3f, 25f, 12f), new Vector3(100f, 150f, 130f)) },
@@ -1325,18 +1392,34 @@ namespace Oxide.Plugins
 				{ "monument_marker", new BoundsValues(new Vector3(0f, 0f, 0f), new Vector3(100f, 100f, 100f)) }
 			};
 			
+			LoadBoundsConfig(_defaultBoundsPath, out _defaultBoundsValues);
+			_defaultBoundsValues ??= new Hash<string, BoundsValues>();
 			foreach (var kvp in initialBounds)
 			{
-				if (!_defaultBounds.TryGetValue(kvp.Key, out var bounds) || bounds == null)
-					_defaultBounds[kvp.Key] = kvp.Value;
+				if (!_defaultBoundsValues.TryGetValue(kvp.Key, out var bounds) || bounds == null)
+					_defaultBoundsValues[kvp.Key] = kvp.Value;
 			}
-			initialBounds.Clear();
-			_cargoBounds = _defaultBounds[Str_CargoShip];
+			_spawnableBoundsValues = new Hash<string, BoundsValues>(StringComparer.OrdinalIgnoreCase)
+			{
+				{ Str_CargoShip, _defaultBoundsValues[Str_CargoShip] },
+				{ "deepsea_floatingcity1", _defaultBoundsValues["deepsea_floatingcity1"] },
+				{ "deepsea_floatingcity2", _defaultBoundsValues["deepsea_floatingcity2"] },
+				{ "deepsea_floatingcity3", _defaultBoundsValues["deepsea_floatingcity3"] },
+				{ "deepsea_floatingcity4", _defaultBoundsValues["deepsea_floatingcity4"] },
+				{ "deepsea_island_tropical1", _defaultBoundsValues["deepsea_island_tropical1"] },
+				{ "deepsea_island_tropical2", _defaultBoundsValues["deepsea_island_tropical2"] },
+				{ "deepsea_island_tropical3", _defaultBoundsValues["deepsea_island_tropical3"] },
+				{ "deepsea_island_tropical4", _defaultBoundsValues["deepsea_island_tropical4"] },
+				{ "ghostship", _defaultBoundsValues["ghostship"] },
+				{ "ghostship_b", _defaultBoundsValues["ghostship_b"] },
+				{ "ghostship_c", _defaultBoundsValues["ghostship_c"] },
+				{ "ghostship_d", _defaultBoundsValues["ghostship_d"] }
+			};
 		}
 		
 		private void FreeBoundsConfig()
         {
-            _defaultBounds.Clear();
+            _defaultBoundsValues.Clear();
             _monumentsBounds.Clear();
             _customMonumentsBounds.Clear();
         }
@@ -1363,7 +1446,7 @@ namespace Oxide.Plugins
             RadTownWater,
             RadTownSmall,
             TunnelStation,
-            MiningQuarry,
+			MiningQuarry,
             BunkerEntrance,
             Cave,
             Swamp,
@@ -1371,23 +1454,15 @@ namespace Oxide.Plugins
             PowerSubstation,
 			Ruins,
 			WaterWell,
-            Custom
+			DeepSeaIsland,
+			Custom
         }
 		
 		public class MonumentWatcher : MonoBehaviour
 		{
 			public string ID { get; private set; }
-			
-			private MonumentCategory _category;
-			public MonumentCategory Category
-            {
-				get => _category;
-				private set
-                {
-					_category = value;
-					CategoryString = value.ToString();
-				}
-			}
+			public ulong ParentID { get; private set; }
+			public MonumentCategory Category { get; private set; }
 			public string CategoryString { get; private set; }
 			
 			public string Prefab { get; private set; }
@@ -1411,10 +1486,12 @@ namespace Oxide.Plugins
 				enabled = false;
 			}
 
-            public void InitializeProperties(string monumentID, MonumentCategory category, string prefab, string langKey, string suffix = "", bool isCustom = false)
+            public void InitializeProperties(string monumentID, MonumentCategory category, string prefab, string langKey, string suffix = "", bool isCustom = false, ulong parnetID = 0uL)
             {
                 ID = monumentID;
-                Category = category;
+				ParentID = parnetID;
+				Category = category;
+				CategoryString = Category.ToString();
 				Prefab = prefab;
                 LangKey = langKey;
 				Suffix = suffix;
@@ -1423,7 +1500,7 @@ namespace Oxide.Plugins
 			
 			public void InitializeBounds(Vector3 center, Vector3 size, Quaternion rotation, Transform parent = null)
             {
-                if (parent is not null)
+				if (parent is not null)
                 {
 					IsMoveable = true;
 					transform.parent = parent;
@@ -1436,8 +1513,8 @@ namespace Oxide.Plugins
 					transform.position = center;
                     transform.rotation = rotation;
                 }
-
-                if (boxCollider is not null)
+				
+				if (boxCollider is not null)
                     DestroyImmediate(boxCollider);
                 if (rigidbody is not null)
                     DestroyImmediate(rigidbody);
@@ -1447,8 +1524,8 @@ namespace Oxide.Plugins
                 rigidbody.isKinematic = true;
                 rigidbody.detectCollisions = true;
                 rigidbody.collisionDetectionMode = CollisionDetectionMode.Discrete;
-
-                boxCollider = gameObject.GetComponent<BoxCollider>();
+				
+				boxCollider = gameObject.GetComponent<BoxCollider>();
                 if (boxCollider is null)
                 {
                     boxCollider = gameObject.AddComponent<BoxCollider>();
@@ -1460,88 +1537,79 @@ namespace Oxide.Plugins
 			
 			private void OnTriggerEnter(Collider collider)
             {
-				if (Instance is null || collider is null || collider.gameObject is null || collider.gameObject.ToBaseEntity() is not BaseEntity entity || !entity.IsValid()) return;
+				if (Instance == null)
+                {
+					if (this != null && gameObject != null)
+						Interface.Oxide.NextTick(() => UnityEngine.Object.Destroy(gameObject));
+					return;
+                }
+				var entity = collider?.gameObject?.ToBaseEntity();
+				if (!entity.IsValid()) return;
 				
 				bool callHook = true;
+				List<MonumentWatcher> watchers;
 				string oldMonumentID = string.Empty;
-                MonumentWatcher moveableWatcher = null;
 				if (entity is BasePlayer player)
 				{
-					if (player.userID.IsSteamId())
-                    {
-						if (PlayersList.Add(player))
-						{
-							if (!_playersInMonuments.TryGetValue(player.userID, out var watchers))
-								_playersInMonuments[player.userID] = watchers = new List<MonumentWatcher>();
-							if (watchers.Any()) oldMonumentID = watchers[^1].ID;
-							watchers.Add(this);
-							if (!this.IsMoveable)
-							{
-								foreach (var watcher in watchers)
-                                {
-									if (watcher.IsMoveable)
-										moveableWatcher = watcher;
-                                }
-								if (moveableWatcher != null)
-								{
-									watchers.Remove(moveableWatcher);
-                                    watchers.Add(moveableWatcher);
-									callHook = false;
-                                }
-							}
-							if (callHook) Interface.CallHook(Hooks_OnPlayerEnteredMonument, ID, player, CategoryString, oldMonumentID);
-						}
-					}
-					else if (NpcsList.Add(player))
+					bool isNpc = !player.userID.IsSteamId();
+					if (isNpc)
 					{
-                        if (!_npcsInMonuments.TryGetValue(player.net.ID, out var watchers))
+						if (!NpcsList.Add(player)) return;
+						if (!_npcsInMonuments.TryGetValue(player.net.ID, out watchers) || watchers == null)
 							_npcsInMonuments[player.net.ID] = watchers = new List<MonumentWatcher>();
-						if (watchers.Any()) oldMonumentID = watchers[^1].ID;
-						watchers.Add(this);
-						if (!this.IsMoveable)
-                        {
-                            foreach (var watcher in watchers)
-                            {
-                                if (watcher.IsMoveable)
-                                    moveableWatcher = watcher;
-                            }
-                            if (moveableWatcher != null)
-                            {
-                                watchers.Remove(moveableWatcher);
-                                watchers.Add(moveableWatcher);
-                                callHook = false;
-                            }
-                        }
-						if (callHook) Interface.CallHook(Hooks_OnNpcEnteredMonument, ID, player, CategoryString, oldMonumentID);
 					}
-				}
-                else if (EntitiesList.Add(entity))
-				{
-                    if (!_entitiesInMonuments.TryGetValue(entity.net.ID, out var watchers))
-						_entitiesInMonuments[entity.net.ID] = watchers = new List<MonumentWatcher>();
-					if (watchers.Any()) oldMonumentID = watchers[^1].ID;
-					watchers.Add(this);
-					if (!this.IsMoveable)
-                    {
-                        foreach (var watcher in watchers)
-                        {
-                            if (watcher.IsMoveable)
-                                moveableWatcher = watcher;
-                        }
-                        if (moveableWatcher != null)
-                        {
-                            watchers.Remove(moveableWatcher);
-                            watchers.Add(moveableWatcher);
-                            callHook = false;
-                        }
+					else
+					{
+						if (!PlayersList.Add(player)) return;
+						if (!_playersInMonuments.TryGetValue(player.userID, out watchers) || watchers == null)
+							_playersInMonuments[player.userID] = watchers = new List<MonumentWatcher>();
                     }
+					HandleWatcherList();
+					if (callHook) Interface.CallHook(isNpc ? Hooks_OnNpcEnteredMonument : Hooks_OnPlayerEnteredMonument, ID, player, CategoryString, oldMonumentID);
+				}
+                else
+				{
+					if (!EntitiesList.Add(entity)) return;
+					if (!_entitiesInMonuments.TryGetValue(entity.net.ID, out watchers) || watchers == null)
+						_entitiesInMonuments[entity.net.ID] = watchers = new List<MonumentWatcher>();
+					HandleWatcherList();
 					if (callHook) Interface.CallHook(Hooks_OnEntityEnteredMonument, ID, entity, CategoryString, oldMonumentID);
 				}
-			}
-			
-			private void OnTriggerExit(Collider collider)
-			{
-				if (collider is null || collider.gameObject is null || collider.gameObject.ToBaseEntity() is not BaseEntity entity || !entity.IsValid()) return;
+				
+				void HandleWatcherList()
+                {
+					if (watchers.Any())
+                        oldMonumentID = watchers[^1].ID;
+                    watchers.Add(this);
+					if (!this.IsMoveable)
+                    {
+						MonumentWatcher watcher;
+						int lastIndex = watchers.Count - 1;
+						for (int i = lastIndex; i >= 0; i--)
+                        {
+							watcher = watchers[i];
+                            if (watcher.IsMoveable)
+                            {
+                                watchers.RemoveAt(i);
+								watchers.Insert(lastIndex, watcher);
+								lastIndex--;
+								callHook = false;
+                            }
+                        }
+                    }
+				}
+            }
+
+            private void OnTriggerExit(Collider collider)
+            {
+				if (Instance == null)
+                {
+					if (this != null && gameObject != null)
+                        Interface.Oxide.NextTick(() => UnityEngine.Object.Destroy(gameObject));
+					return;
+                }
+				var entity = collider?.gameObject?.ToBaseEntity();
+				if (!entity.IsValid()) return;
 
 				if (entity is BasePlayer player)
 				{
@@ -1560,7 +1628,7 @@ namespace Oxide.Plugins
 					watchers.Remove(this);
 					if (!watchers.Any()) _playersInMonuments.Remove(player.userID);
 					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase)) newMonumentID = watchers[^1].ID;
-				}
+                }
 				Interface.CallHook(Hooks_OnPlayerExitedMonument, ID, player, CategoryString, reason, newMonumentID);
 				if (remove) PlayersList.Remove(player);
 			}
@@ -1595,26 +1663,29 @@ namespace Oxide.Plugins
 			
 			private void OnDestroy()
             {
-				_monumentsList.Remove(ID);
-                foreach (var player in PlayersList)
-                {
-					if (player.IsValid())
-						OnPlayerExit(player, Str_ClearList, false);
+				if (Instance != null)
+				{
+					_monumentsList.Remove(ID);
+                    foreach (var player in PlayersList)
+                    {
+                        if (player.IsValid())
+                            OnPlayerExit(player, Str_MonumentDestroyed, false);
+                    }
+                    foreach (var npcPlayer in NpcsList)
+                    {
+                        if (npcPlayer.IsValid())
+                            OnNpcExit(npcPlayer, Str_MonumentDestroyed, false);
+                    }
+                    foreach (var entity in EntitiesList)
+                    {
+                        if (entity.IsValid())
+                            OnEntityExit(entity, Str_MonumentDestroyed, false);
+                    }
+					if (ParentID > 0uL) Interface.CallHook(ID.Contains(Str_CargoShip) ? Hooks_OnCargoWatcherDeleted : Hooks_OnSpawnableWatcherDeleted, ID);
 				}
-                foreach (var npcPlayer in NpcsList)
-                {
-					if (npcPlayer.IsValid())
-						OnNpcExit(npcPlayer, Str_ClearList, false);
-				}
-                foreach (var entity in EntitiesList)
-                {
-					if (entity.IsValid())
-						OnEntityExit(entity, Str_ClearList, false);
-				}
-                Pool.FreeUnmanaged(ref PlayersList);
+				Pool.FreeUnmanaged(ref PlayersList);
                 Pool.FreeUnmanaged(ref NpcsList);
                 Pool.FreeUnmanaged(ref EntitiesList);
-				if (ID.Contains(Str_CargoShip)) Interface.CallHook(Hooks_OnCargoWatcherDeleted, ID);
 			}
 		}
 		#endregion
