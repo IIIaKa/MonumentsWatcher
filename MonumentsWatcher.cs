@@ -28,7 +28,7 @@
 *  
 *  Lone.Design plugin page: https://lone.design/product/monuments-watcher/
 *
-*  Copyright © 2024-2025 IIIaKa
+*  Copyright © 2024-2026 IIIaKa
 */
 
 using System;
@@ -51,7 +51,7 @@ namespace Oxide.Plugins
     {
 		#region ~Variables~
         private static MonumentsWatcher Instance { get; set; }
-		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
+		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Showtoast = "gametip.showtoast", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
 			Hooks_OnLoaded = "OnMonumentsWatcherLoaded", Hooks_OnCargoWatcherCreated = "OnCargoWatcherCreated", Hooks_OnCargoWatcherDeleted = "OnCargoWatcherDeleted",
 			Hooks_OnSpawnableWatcherCreated = "OnSpawnableWatcherCreated", Hooks_OnSpawnableWatcherDeleted = "OnSpawnableWatcherDeleted",
 			Hooks_OnPlayerEnteredMonument = "OnPlayerEnteredMonument", Hooks_OnNpcEnteredMonument = "OnNpcEnteredMonument", Hooks_OnEntityEnteredMonument = "OnEntityEnteredMonument",
@@ -59,7 +59,7 @@ namespace Oxide.Plugins
         private static Hash<string, MonumentWatcher> _monumentsList;
 		private static Hash<ulong, List<MonumentWatcher>> _playersInMonuments;
         private static Hash<NetworkableId, List<MonumentWatcher>> _npcsInMonuments, _entitiesInMonuments;
-		private string[] _defaultHooks = new string[] { "OnEntitySpawned", "OnEntityDeath", "OnEntityKill", "OnPlayerTeleported" };
+		private readonly string[] _defaultHooks = new string[] { "OnEntitySpawned", "OnEntityDeath", "OnEntityKill", "OnPlayerTeleported" };
 		#endregion
 
         #region ~Configuration~
@@ -100,27 +100,26 @@ namespace Oxide.Plugins
             }
             else if (_config.Version < Version)
             {
-                PrintWarning($"Your configuration file version({_config.Version}) is outdated. Updating it to {Version}.");
-                _config.Version = Version;
+                PrintWarning($"Your configuration file version({_config.Version}) is outdated. Updating it to {Version}...");
+				string cfgPath = $"{Interface.Oxide.ConfigDirectory}{Path.DirectorySeparatorChar}{Name}.json";
+                if (File.Exists(cfgPath))
+                    File.Move(cfgPath, $"{Interface.Oxide.ConfigDirectory}{Path.DirectorySeparatorChar}_old_{Name}({_config.Version}).json");
+				_config.Version = Version;
                 PrintWarning($"The configuration file has been successfully updated to version {_config.Version}!");
             }
 			
 			if (string.IsNullOrWhiteSpace(_config.Command))
 				_config.Command = "monument";
 			
-			_config.LanguageKeys ??= new List<string>();
-            if (_config.LanguageKeys.Any())
+			string langKey;
+            var oldLangKeys = _config.LanguageKeys ?? new List<string>();
+            _config.LanguageKeys = new List<string>() { "en" };
+			for (int i = 0; i < oldLangKeys.Count; i++)
             {
-                for (int i = _config.LanguageKeys.Count - 1; i >= 0; i--)
-                {
-                    string langKey = ToLangKey(_config.LanguageKeys[i]);
-                    if (langKey.Equals("en", StringComparison.OrdinalIgnoreCase) || langKey.Equals("ru", StringComparison.OrdinalIgnoreCase))
-                        _config.LanguageKeys.RemoveAt(i);
-                    else
-                        _config.LanguageKeys[i] = langKey;
-                }
+                langKey = ToLangKey(oldLangKeys[i]);
+                if (!langKey.Equals("ru", StringComparison.OrdinalIgnoreCase) && !_config.LanguageKeys.Contains(langKey, StringComparer.OrdinalIgnoreCase))
+					_config.LanguageKeys.Add(langKey);
             }
-            _config.LanguageKeys.Add("en");
 			
 			_config.TrackedCategories ??= new HashSet<MonumentCategory>();
 			SaveConfig();
@@ -276,6 +275,9 @@ namespace Oxide.Plugins
             ["jungle_ruins_c"] = "Jungle Ruins",
             ["jungle_ruins_d"] = "Jungle Ruins",
 			["jungle_ruins_e"] = "Jungle Ruins",
+			["tropical_island_dwelling_ruins_b"] = "Tropical Ruins",
+            ["tropical_island_dwelling_ruins_c"] = "Tropical Ruins",
+            ["tropical_island_dwelling_ruins_d"] = "Tropical Ruins",
 			["water_well_a"] = "Water Well",
 			["water_well_b"] = "Water Well",
 			["water_well_c"] = "Water Well",
@@ -428,24 +430,30 @@ namespace Oxide.Plugins
             ["jungle_ruins_c"] = "Руины",
             ["jungle_ruins_d"] = "Руины",
 			["jungle_ruins_e"] = "Руины",
+			["tropical_island_dwelling_ruins_b"] = "Тропически руины",
+            ["tropical_island_dwelling_ruins_c"] = "Тропически руины",
+            ["tropical_island_dwelling_ruins_d"] = "Тропически руины",
 			["water_well_a"] = "Колодец с водой",
 			["water_well_b"] = "Колодец с водой",
 			["water_well_c"] = "Колодец с водой",
 			["water_well_d"] = "Колодец с водой",
 			["water_well_e"] = "Колодец с водой"
 		};
-		#endregion
+        #endregion
 
-		#region ~Methods~
-		private void InitMonuments()
-        {
+        #region ~Methods~
+		private System.Collections.IEnumerator InitMonuments()
+		{
 			LoadDefaultBounds();
 			LoadBoundsConfig(_monumentsBoundsPath, out _monumentsBounds);
 			LoadBoundsConfig(_customMonumentsBoundsPath, out _customMonumentsBounds);
 			ClearWatchers();
+			yield return null;
+			
 			foreach (var entity in BaseNetworkable.serverEntities)
             {
-				if (!entity.IsValid()) continue;
+				if (!entity.IsValid())
+					continue;
 				if (entity is CargoShip cargoShip)
 					CreateCargoWatcher(cargoShip);
 				else if (entity is DeepSeaFloatingCity floatingCity)
@@ -454,7 +462,14 @@ namespace Oxide.Plugins
 					CreateSpawnableWatcher(deepSeaIsland, MonumentCategory.DeepSeaIsland);
 				else if (entity is Prefabs.Misc.GhostShip ghostShip)
 					CreateSpawnableWatcher(ghostShip, MonumentCategory.RadTownWater);
+				else if (entity is NPCDwelling npcDwelling)
+				{
+					if (npcDwelling.PrefabName.Contains("tropical_island_dwelling_ruins_", StringComparison.OrdinalIgnoreCase))
+						CreateSpawnableWatcher(npcDwelling, MonumentCategory.Ruins);
+				}
 			}
+			yield return null;
+			
 			string monumentKey, prefab;
 			int miningoutpost = 0, lighthouse = 0, gasstation = 0, supermarket = 0, tunnel = 0, bunker = 0, cave = 0, icelake = 0, power = 0, waterwell = 0;
 			foreach (var monument in TerrainMeta.Path.Monuments)
@@ -469,7 +484,8 @@ namespace Oxide.Plugins
 					continue;
                 }
 				monumentKey = ClearMonumentName(prefab);
-				if (!_defaultBoundsValues.ContainsKey(monumentKey)) continue;
+				if (!_defaultBoundsValues.ContainsKey(monumentKey))
+					continue;
 				if (monument.IsSafeZone)
                 {
 					CreateWatcher(monumentKey, MonumentCategory.SafeZone, monument.transform, prefab);
@@ -563,15 +579,20 @@ namespace Oxide.Plugins
 						CreateWatcher(monumentKey, MonumentCategory.RadTown, monument.transform, prefab);
 						break;
                 }
-			}
+            }
+			yield return null;
+			
+			Vector3 groundPos;
 			float stationDistance = 100f;
+			MonumentWatcher parentWatcher;
 			foreach (var station in TerrainMeta.Path.DungeonGridCells)
             {
-				if (!station.name.Contains("/tunnel-station/station-", StringComparison.OrdinalIgnoreCase)) continue;
+				if (!station.name.Contains("/tunnel-station/station-", StringComparison.OrdinalIgnoreCase))
+					continue;
+				parentWatcher = null;
 				prefab = station.name.ToLower();
 				monumentKey = ClearMonumentName(prefab);
-				MonumentWatcher parentWatcher = null;
-				var groundPos = new Vector3(station.transform.position.x, TerrainMeta.HeightMap.GetHeight(station.transform.position), station.transform.position.z);
+				groundPos = new Vector3(station.transform.position.x, TerrainMeta.HeightMap.GetHeight(station.transform.position), station.transform.position.z);
 				foreach (var monument in _monumentsList.Values)
                 {
 					if ((monument.Category == MonumentCategory.SafeZone || monument.Category == MonumentCategory.RadTown) && Vector3.Distance(monument.boxCollider.ClosestPointOnBounds(groundPos), groundPos) <= stationDistance)
@@ -582,25 +603,35 @@ namespace Oxide.Plugins
                 {
 					CreateWatcher(monumentKey, MonumentCategory.TunnelStation, station.transform, prefab, $"_{parentWatcher.ID}");
 					if (_monumentsList.TryGetValue($"{monumentKey}_{parentWatcher.ID}", out var stationWatcher))
-						stationWatcher.LangKey = $"{parentWatcher.ID}_station";
+						stationWatcher.TextKey = $"{parentWatcher.ID}_station";
 					continue;
 				}
 				
 				tunnel++;
 				CreateWatcher(monumentKey, MonumentCategory.TunnelStation, station.transform, prefab, $"_{tunnel}", $"#{tunnel}");
-			}
+            }
+			yield return null;
 			
-			for (int i = 0; i < _defaultHooks.Length; i++)
-				Subscribe(_defaultHooks[i]);
 			SaveBoundsConfig(_defaultBoundsPath, _defaultBoundsValues);
 			SaveBoundsConfig(_monumentsBoundsPath, _monumentsBounds);
 			SaveBoundsConfig(_customMonumentsBoundsPath, _customMonumentsBounds);
 			FreeBoundsConfig();
+			for (int i = 0; i < _config.LanguageKeys.Count; i++)
+                HandleLanguageFile(_enLang, _config.LanguageKeys[i]);
+            HandleLanguageFile(_ruLang, "ru");
+            _enLang.Clear();
+            _ruLang.Clear();
+			for (int i = 0; i < _defaultHooks.Length; i++)
+				Subscribe(_defaultHooks[i]);
+			yield return null;
+			
+			Interface.CallHook(Hooks_OnLoaded, Version);
 		}
 		
 		private void CreateCargoWatcher(CargoShip cargoShip)
         {
-			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(MonumentCategory.RadTownWater)) || !cargoShip.IsValid()) return;
+			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(MonumentCategory.RadTownWater)) || !cargoShip.IsValid())
+				return;
 			ulong cargoID = cargoShip.net.ID.Value;
 			string monumentID = $"CargoShip_{cargoID}";
 			var bounds = _spawnableBoundsValues[Str_CargoShip];
@@ -614,7 +645,8 @@ namespace Oxide.Plugins
 		
 		private void CreateSpawnableWatcher(BaseEntity entity, MonumentCategory category)
         {
-			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category)) || !entity.IsValid()) return;
+			if ((_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category)) || !entity.IsValid())
+				return;
 			ulong netID = entity.net.ID.Value;
 			string prefab = entity.name.ToLower(), monumentKey = ClearMonumentName(prefab), monumentID = $"{monumentKey}_{netID}";
 			var bounds = _spawnableBoundsValues[monumentKey];
@@ -632,11 +664,12 @@ namespace Oxide.Plugins
             _ruLang[$"custom_{monumentID}"] = displayName;
             if (!_customMonumentsBounds.TryGetValue(monumentID, out var bounds) || bounds == null)
             {
-                var rotation = transform.rotation.eulerAngles;
-                var colArray = new Collider[5];
+				Collider collider;
+				var colArray = new Collider[5];
+				var rotation = transform.rotation.eulerAngles;
 				for (var i = 0; i < Physics.OverlapSphereNonAlloc(transform.position, 1f, colArray, Rust.Layers.Mask.Prevent_Building, QueryTriggerInteraction.Ignore); i++)
                 {
-					var collider = colArray[i];
+					collider = colArray[i];
                     if (collider != null && collider.name.Contains("prevent_building", StringComparison.OrdinalIgnoreCase))
                     {
                         rotation = collider.transform.rotation.eulerAngles;
@@ -646,7 +679,8 @@ namespace Oxide.Plugins
                 _customMonumentsBounds[monumentID] = bounds = new CustomMonumentBounds(_defaultBoundsValues["monument_marker"], transform.position, rotation, MonumentCategory.Custom);
             }
 			
-			if (bounds.MonumentCategory != MonumentCategory.Custom && _config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(bounds.MonumentCategory)) return;
+			if (bounds.MonumentCategory != MonumentCategory.Custom && _config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(bounds.MonumentCategory))
+				return;
 			var watcher = new GameObject().AddComponent<MonumentWatcher>();
 			watcher.InitializeProperties(monumentID, bounds.MonumentCategory, prefab, $"custom_{monumentID}", isCustom: true);
 			watcher.InitializeBounds(bounds.Center + (Quaternion.Euler(bounds.Rotation) * bounds.CenterOffset), bounds.Size, Quaternion.Euler(bounds.Rotation));
@@ -655,7 +689,8 @@ namespace Oxide.Plugins
 		
 		private void CreateWatcher(string monumentKey, MonumentCategory category, Transform transform, string prefab, string idSuffix = "", string suffix = "")
         {
-			if (_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category)) return;
+			if (_config.TrackedCategories.Any() && !_config.TrackedCategories.Contains(category))
+				return;
 			string monumentID = $"{monumentKey}{(!string.IsNullOrWhiteSpace(idSuffix) ? idSuffix : string.Empty)}";
 			if (!_monumentsBounds.TryGetValue(monumentID, out var bounds) || bounds == null)
 				_monumentsBounds[monumentID] = bounds = new MonumentBounds(_defaultBoundsValues[monumentKey], transform.position, transform.rotation.eulerAngles);
@@ -690,18 +725,6 @@ namespace Oxide.Plugins
             }
 		}
 		
-		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey)
-		{
-			var existFile = lang.GetMessages(langKey, this);
-			if (existFile == null || !existFile.Any())
-			{
-				if (!Directory.Exists(Path.Combine(Interface.Oxide.LangDirectory, langKey)))
-					Directory.CreateDirectory(Path.Combine(Interface.Oxide.LangDirectory, langKey));
-				File.WriteAllText(Path.Combine(Interface.Oxide.LangDirectory, $"{langKey}{Path.DirectorySeparatorChar}{Name}.json"), JsonConvert.SerializeObject(langFile, Formatting.Indented));
-			}
-			lang.RegisterMessages(langFile, this, langKey);
-		}
-		
 		private bool TryGetPlayerWatcher(BasePlayer player, out MonumentWatcher result, bool closest = true)
         {
 			result = null;
@@ -709,11 +732,11 @@ namespace Oxide.Plugins
 				result = watchers[^1];
 			else if (closest)
 			{
-				float minDistance = float.MaxValue;
+				float minDistance = float.MaxValue, distance;
 				var pos = player.transform.position;
                 foreach (var watcher in _monumentsList.Values)
                 {
-                    float distance = (pos - watcher.transform.position).sqrMagnitude;
+					distance = (pos - watcher.transform.position).sqrMagnitude;
                     if (distance < minDistance)
                     {
                         minDistance = distance;
@@ -726,13 +749,15 @@ namespace Oxide.Plugins
 		
 		private void ShowBounds(MonumentWatcher watcher, BasePlayer player, float duration = 20f)
         {
-			if (watcher == null || player == null) return;
-            bool isAdmin = player.IsAdmin;
+			if (watcher == null || player == null)
+				return;
+			bool isAdmin = player.IsAdmin;
             try
             {
-                if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, true);
-
-                //TEXT
+				if (!isAdmin)
+					UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, true);
+				
+				//TEXT
                 player.SendConsoleCommand("ddraw.text", duration, Color.magenta, watcher.transform.position, watcher.ID);
 
                 //CENTER
@@ -740,8 +765,9 @@ namespace Oxide.Plugins
 
                 //CORNERS
                 Vector3 size = watcher.boxCollider.size * 0.5f,
-                    center = watcher.boxCollider.center;
-                var transform = watcher.boxCollider.transform;
+                    center = watcher.boxCollider.center,
+					corner, startPos, endPos;
+				var transform = watcher.boxCollider.transform;
                 Vector3[] corners = new Vector3[8],
                     offsets = new Vector3[8]
                     {
@@ -756,27 +782,29 @@ namespace Oxide.Plugins
                     };
                 for (int i = 0; i < offsets.Length; i++)
                 {
-                    var corner = corners[i] = transform.TransformPoint(center + offsets[i]);
+					corner = corners[i] = transform.TransformPoint(center + offsets[i]);
                     player.SendConsoleCommand("ddraw.sphere", duration, Color.red, corner, 1f);
                 }
 
                 //LINES
                 for (int i = 0; i < corners.Length; i++)
                 {
-                    var startPos = corners[i];
-                    foreach (var endPos in corners)
-                    {
-                        if (endPos != startPos)
-                            player.SendConsoleCommand("ddraw.line", duration, Color.red, startPos, endPos);
-                    }
+					startPos = corners[i];
+					for (int j = 0; j < corners.Length; j++)
+					{
+						endPos = corners[j];
+						if (endPos != startPos)
+							player.SendConsoleCommand("ddraw.line", duration, Color.red, startPos, endPos);
+					}
                 }
                 player.AddPingAtLocation(BasePlayer.PingType.GoTo, watcher.transform.position + watcher.transform.up * 2.5f, duration, new NetworkableId());
             }
             catch {}
             finally
             {
-                if (!isAdmin) UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, false);
-            }
+				if (!isAdmin)
+					UpdateFlag(player, BasePlayer.PlayerFlags.IsAdmin, false);
+			}
 		}
 		
 		private void UpdateFlag(BasePlayer player, BasePlayer.PlayerFlags flag, bool addFlag)
@@ -788,23 +816,42 @@ namespace Oxide.Plugins
 			}
 		}
 		
-		private static string ClearMonumentName(string prefabName)
-        {
-            prefabName = prefabName.Replace(".prefab", string.Empty);
-            string[] parts = prefabName.Split('/');
-
-            return parts[^1];
-        }
+		private static string ClearMonumentName(string prefabName) => prefabName.Split('/')[^1].Replace(".prefab", string.Empty);
 		
 		private static void SendMessage(IPlayer player, string message, bool isWarning = true)
         {
             if (_config.GameTips_Enabled && !player.IsServer)
-                player.Command("gametip.showtoast", (int)(isWarning ? GameTip.Styles.Error : GameTip.Styles.Blue_Long), message, string.Empty);
+                player.Command(Str_Showtoast, (int)(isWarning ? GameTip.Styles.Error : GameTip.Styles.Blue_Long), message, string.Empty);
             else
                 player.Reply(message);
         }
 		
-		public static string ToLangKey(string langKey) => string.IsNullOrWhiteSpace(langKey) || langKey.Length != 2 || !langKey.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z') ? "en" : langKey.ToLower(System.Globalization.CultureInfo.InvariantCulture);
+		private static string ToLangKey(string langKey)
+        {
+            if (string.IsNullOrWhiteSpace(langKey))
+                return "en";
+
+            var parts = langKey.Split('-');
+            if (parts.Length < 1 || !parts[0].All(c => char.IsLetter(c)))
+                return "en";
+
+            if (parts.Length < 2 || !parts[1].All(c => char.IsLetter(c)))
+                return parts[0].ToLowerInvariant();
+
+            return $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}";
+        }
+		
+		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey)
+        {
+            var existFile = lang.GetMessages(langKey, this);
+            if (existFile == null || !existFile.Any())
+            {
+                if (!Directory.Exists(Path.Combine(Interface.Oxide.LangDirectory, langKey)))
+                    Directory.CreateDirectory(Path.Combine(Interface.Oxide.LangDirectory, langKey));
+                File.WriteAllText(Path.Combine(Interface.Oxide.LangDirectory, $"{langKey}{Path.DirectorySeparatorChar}{Name}.json"), JsonConvert.SerializeObject(langFile, Formatting.Indented));
+            }
+            lang.RegisterMessages(langFile, this, langKey);
+        }
 		#endregion
 
         #region ~API~
@@ -821,9 +868,8 @@ namespace Oxide.Plugins
 		
 		private string GetMonumentDisplayNameByLang(string monumentID, string langKey = "en", bool showSuffix = true)
         {
-			if (string.IsNullOrWhiteSpace(langKey) || langKey.Length != 2 || !langKey.All(c => char.IsLetter(c))) langKey = "en";
 			if (_monumentsList.TryGetValue(monumentID, out var watcher))
-                return $"{lang.GetMessageByLanguage(watcher.LangKey, this, langKey)}{(showSuffix && !string.IsNullOrWhiteSpace(watcher.Suffix) ? $" {watcher.Suffix}" : string.Empty)}";
+                return $"{lang.GetMessageByLanguage(watcher.TextKey, this, langKey)}{(showSuffix && !string.IsNullOrWhiteSpace(watcher.Suffix) ? $" {watcher.Suffix}" : string.Empty)}";
             return string.Empty;
         }
 		
@@ -865,7 +911,7 @@ namespace Oxide.Plugins
                     result = watcher;
                 }
             }
-			return result != null ? result.ID : string.Empty;
+			return result?.ID ?? string.Empty;
 		}
 		
 		private bool IsPosInMonument(string monumentID, Vector3 pos)
@@ -943,9 +989,16 @@ namespace Oxide.Plugins
 		private object GetMonumentNpcs(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.NpcsList.ToArray() : null;
 		
 		private string GetNpcMonument(BasePlayer npcPlayer) => npcPlayer.IsValid() ? GetNpcMonument(npcPlayer.net.ID) : string.Empty;
-		private string GetNpcMonument(NetworkableId netID) => _npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any() ? watchers[^1].ID : string.Empty;
+		private string GetNpcMonument(ulong netID) => GetNpcMonument(new NetworkableId(netID));
+		private string GetNpcMonument(NetworkableId netID)
+		{
+            if (_npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
+                return watchers[^1].ID;
+            return string.Empty;
+        }
 		
 		private object GetNpcMonuments(BasePlayer npcPlayer) => npcPlayer.IsValid() ? GetNpcMonuments(npcPlayer.net.ID) : null;
+		private object GetNpcMonuments(ulong netID) => GetNpcMonuments(new NetworkableId(netID));
 		private object GetNpcMonuments(NetworkableId netID)
         {
             if (_npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
@@ -959,6 +1012,7 @@ namespace Oxide.Plugins
         }
 		
 		private bool IsNpcInMonument(string monumentID, NetworkableId netID) => IsNpcInMonument(monumentID, BaseNetworkable.serverEntities.Find(netID) as BasePlayer);
+		private bool IsNpcInMonument(string monumentID, ulong netID) => IsNpcInMonument(monumentID, BaseNetworkable.serverEntities.Find(new NetworkableId(netID)) as BasePlayer);
 		private bool IsNpcInMonument(string monumentID, BasePlayer npcPlayer) => npcPlayer.IsValid() && _npcsInMonuments.TryGetValue(npcPlayer.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
         #endregion
 
@@ -966,6 +1020,7 @@ namespace Oxide.Plugins
 		private object GetMonumentEntities(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.EntitiesList.ToArray() : null;
 		
 		private string GetEntityMonument(BaseEntity entity) => entity.IsValid() ? GetEntityMonument(entity.net.ID) : string.Empty;
+		private string GetEntityMonument(ulong netID) => GetEntityMonument(new NetworkableId(netID));
 		private string GetEntityMonument(NetworkableId netID)
         {
             if (_entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
@@ -974,6 +1029,7 @@ namespace Oxide.Plugins
         }
 		
 		private object GetEntityMonuments(BaseEntity entity) => entity.IsValid() ? GetEntityMonuments(entity.net.ID) : null;
+		private object GetEntityMonuments(ulong netID) => GetEntityMonuments(new NetworkableId(netID));
 		private object GetEntityMonuments(NetworkableId netID)
         {
             if (_entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
@@ -987,6 +1043,7 @@ namespace Oxide.Plugins
         }
 		
 		private bool IsEntityInMonument(string monumentID, NetworkableId netID) => IsEntityInMonument(monumentID, BaseNetworkable.serverEntities.Find(netID) as BaseEntity);
+		private bool IsEntityInMonument(string monumentID, ulong netID) => IsEntityInMonument(monumentID, BaseNetworkable.serverEntities.Find(new NetworkableId(netID)) as BaseEntity);
 		private bool IsEntityInMonument(string monumentID, BaseEntity entity) => entity.IsValid() && _entitiesInMonuments.TryGetValue(entity.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
 		#endregion
 		
@@ -995,6 +1052,11 @@ namespace Oxide.Plugins
 		void OnEntitySpawned(DeepSeaFloatingCity floatingCity) => CreateSpawnableWatcher(floatingCity, MonumentCategory.SafeZone);
 		void OnEntitySpawned(DeepSeaIsland deepSeaIsland) => CreateSpawnableWatcher(deepSeaIsland, MonumentCategory.DeepSeaIsland);
 		void OnEntitySpawned(Prefabs.Misc.GhostShip ghostShip) => CreateSpawnableWatcher(ghostShip, MonumentCategory.RadTownWater);
+		void OnEntitySpawned(NPCDwelling npcDwelling)
+		{
+			if (npcDwelling.IsValid() && npcDwelling.PrefabName.Contains("tropical_island_dwelling_ruins_", StringComparison.OrdinalIgnoreCase))
+				CreateSpawnableWatcher(npcDwelling, MonumentCategory.Ruins);
+		}
 		
 		void OnEntityKill(DeepSeaFloatingCity floatingCity)
         {
@@ -1013,6 +1075,12 @@ namespace Oxide.Plugins
             if ((!_config.TrackedCategories.Any() || _config.TrackedCategories.Contains(MonumentCategory.RadTownWater)) && ghostShip.IsValid())
                 TryDeleteWatcher(ghostShip.net.ID.Value);
         }
+		
+		void OnEntityKill(NPCDwelling npcDwelling)
+        {
+			if ((!_config.TrackedCategories.Any() || _config.TrackedCategories.Contains(MonumentCategory.Ruins)) && npcDwelling.IsValid())
+                TryDeleteWatcher(npcDwelling.net.ID.Value);
+		}
 		
 		void OnEntityDeath(BasePlayer player)
 		{
@@ -1042,15 +1110,14 @@ namespace Oxide.Plugins
 		
 		void OnPlayerTeleported(BasePlayer player, Vector3 oldPos, Vector3 newPos)
         {
-			if (_playersInMonuments.TryGetValue(player.userID, out var watchers))
+			if (!_playersInMonuments.TryGetValue(player.userID, out var watchers))
+				return;
+			MonumentWatcher watcher;
+            for (int i = watchers.Count - 1; i >= 0; i--)
             {
-				MonumentWatcher watcher;
-				for (int i = watchers.Count - 1; i >= 0; i--)
-				{
-					watcher = watchers[i];
-					if (watcher != null && watcher.IsInBounds(oldPos) && !watcher.IsInBounds(newPos))
-						watcher.OnPlayerExit(player, Str_Leave);
-				}
+                watcher = watchers[i];
+                if (watcher != null && watcher.IsInBounds(oldPos) && !watcher.IsInBounds(newPos))
+                    watcher.OnPlayerExit(player, Str_Leave);
             }
 		}
 		
@@ -1065,7 +1132,7 @@ namespace Oxide.Plugins
 			_playersInMonuments = new Hash<ulong, List<MonumentWatcher>>();
 			_npcsInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
 			_entitiesInMonuments = new Hash<NetworkableId, List<MonumentWatcher>>();
-			string path = $"MonumentsWatcher{Path.DirectorySeparatorChar}";
+			string path = $"{Name}{Path.DirectorySeparatorChar}";
 			_defaultBoundsPath = $"{path}DefaultBounds";
 			_monumentsBoundsPath = $"{path}MonumentsBounds";
             _customMonumentsBoundsPath = $"{path}CustomMonumentsBounds";
@@ -1084,13 +1151,7 @@ namespace Oxide.Plugins
 				}
 				SaveConfig();
             }
-			InitMonuments();
-			for (int i = 0; i < _config.LanguageKeys.Count; i++)
-				HandleLanguageFile(_enLang, _config.LanguageKeys[i]);
-			HandleLanguageFile(_ruLang, "ru");
-			_enLang.Clear();
-			_ruLang.Clear();
-			timer.Once(1f, () => Interface.CallHook(Hooks_OnLoaded, Version));
+			ServerMgr.Instance.StartCoroutine(InitMonuments());
 		}
 		
 		void Unload()
@@ -1109,8 +1170,9 @@ namespace Oxide.Plugins
 		private static readonly string[] _cmdKeys = { "show", "list", "rotate", "recreate" };
 		private void MonumentsWatcher_Command(IPlayer player, string command, string[] args)
 		{
-			if (!player.IsAdmin && !permission.UserHasPermission(player.Id, PERMISSION_ADMIN)) return;
-            int index = args != null && args.Length > 0 ? Array.FindIndex(_cmdKeys, key => key.Equals(args[0], StringComparison.OrdinalIgnoreCase)) : -1;
+			if (!player.IsAdmin && !permission.UserHasPermission(player.Id, PERMISSION_ADMIN))
+				return;
+			int index = args != null && args.Length > 0 ? Array.FindIndex(_cmdKeys, key => key.Equals(args[0], StringComparison.OrdinalIgnoreCase)) : -1;
 			if (index < 0)
 				goto notValid;
 			
@@ -1138,7 +1200,7 @@ namespace Oxide.Plugins
                 {
                     foreach (var watcher2 in _monumentsList.Values)
                     {
-                        if (watcher2.LangKey.Contains(args[1], StringComparison.OrdinalIgnoreCase) && !monumentsList.Contains(watcher2))
+                        if (watcher2.TextKey.Contains(args[1], StringComparison.OrdinalIgnoreCase) && !monumentsList.Contains(watcher2))
                             monumentsList.Add(watcher2);
                     }
                 }
@@ -1176,8 +1238,8 @@ namespace Oxide.Plugins
                 if (args.Length > 1 && args[1].Equals("help", StringComparison.OrdinalIgnoreCase))
 					goto notValid;
 				
+				float yRot = 0f;
 				MonumentWatcher watcher = null;
-                float yRot = 0f;
 				if ((args.Length < 3 || !float.TryParse(args[2], out yRot)) && bPlayer != null)
 					yRot = bPlayer.viewAngles.y;
 				if ((args.Length < 2 || !_monumentsList.TryGetValue(args[1], out watcher)) && bPlayer != null)
@@ -1218,12 +1280,11 @@ namespace Oxide.Plugins
                 if (args.Length > 1)
                 {
                     if (args[1].Equals("custom", StringComparison.OrdinalIgnoreCase))
-                        array = new string[1] { $"{Name}{Path.DirectorySeparatorChar}CustomMonumentsBounds" };
+                        array = new string[] { $"{Name}{Path.DirectorySeparatorChar}CustomMonumentsBounds" };
                     else if (args[1].Equals("all", StringComparison.OrdinalIgnoreCase))
-                        array = new string[2] { $"{Name}{Path.DirectorySeparatorChar}MonumentsBounds", $"{Name}{Path.DirectorySeparatorChar}CustomMonumentsBounds" };
+                        array = new string[] { $"{Name}{Path.DirectorySeparatorChar}MonumentsBounds", $"{Name}{Path.DirectorySeparatorChar}CustomMonumentsBounds" };
                 }
-                if (array == null)
-                    array = new string[1] { $"{Name}{Path.DirectorySeparatorChar}MonumentsBounds" };
+				array ??= new string[] { $"{Name}{Path.DirectorySeparatorChar}MonumentsBounds" };
                 for (int i = 0; i < array.Length; i++)
                     Interface.Oxide.DataFileSystem.DeleteDataFile(array[i]);
                 InitMonuments();
@@ -1280,10 +1341,10 @@ namespace Oxide.Plugins
 			}
 		}
 		
+		private Hash<string, MonumentBounds> _monumentsBounds;
+		private Hash<string, CustomMonumentBounds> _customMonumentsBounds;
 		private Hash<string, BoundsValues> _defaultBoundsValues, _spawnableBoundsValues;
-        private Hash<string, MonumentBounds> _monumentsBounds;
-        private Hash<string, CustomMonumentBounds> _customMonumentsBounds;
-        private string _defaultBoundsPath = string.Empty, _monumentsBoundsPath = string.Empty, _customMonumentsBoundsPath = string.Empty;
+		private string _defaultBoundsPath = string.Empty, _monumentsBoundsPath = string.Empty, _customMonumentsBoundsPath = string.Empty;
 		
 		private void LoadDefaultBounds()
         {
@@ -1384,6 +1445,9 @@ namespace Oxide.Plugins
 				{ "jungle_ruins_c", new BoundsValues(new Vector3(0f, 10f, -0.5f), new Vector3(40f, 30f, 40f)) },
 				{ "jungle_ruins_d", new BoundsValues(new Vector3(-1.5f, 10f, 5f), new Vector3(40f, 30f, 40f)) },
 				{ "jungle_ruins_e", new BoundsValues(new Vector3(-1.5f, 10f, 1f), new Vector3(40f, 30f, 40f)) },
+				{ "tropical_island_dwelling_ruins_b", new BoundsValues(new Vector3(2f, 15f, -0.25f), new Vector3(50f, 30f, 60f)) },
+				{ "tropical_island_dwelling_ruins_c", new BoundsValues(new Vector3(0f, 15f, -0.25f), new Vector3(50f, 30f, 60f)) },
+				{ "tropical_island_dwelling_ruins_d", new BoundsValues(new Vector3(4f, 15f, 1f), new Vector3(50f, 30f, 50f)) },
 				{ "water_well_a", new BoundsValues(new Vector3(-2f, 7f, 0f), new Vector3(25f, 20f, 25f)) },
 				{ "water_well_b", new BoundsValues(new Vector3(-1f, 7f, 0f), new Vector3(25f, 20f, 25f)) },
 				{ "water_well_c", new BoundsValues(new Vector3(0f, 10f, 1f), new Vector3(32f, 25f, 32f)) },
@@ -1413,7 +1477,10 @@ namespace Oxide.Plugins
 				{ "ghostship", _defaultBoundsValues["ghostship"] },
 				{ "ghostship_b", _defaultBoundsValues["ghostship_b"] },
 				{ "ghostship_c", _defaultBoundsValues["ghostship_c"] },
-				{ "ghostship_d", _defaultBoundsValues["ghostship_d"] }
+				{ "ghostship_d", _defaultBoundsValues["ghostship_d"] },
+				{ "tropical_island_dwelling_ruins_b", _defaultBoundsValues["tropical_island_dwelling_ruins_b"] },
+                { "tropical_island_dwelling_ruins_c", _defaultBoundsValues["tropical_island_dwelling_ruins_c"] },
+                { "tropical_island_dwelling_ruins_d", _defaultBoundsValues["tropical_island_dwelling_ruins_d"] }
 			};
 		}
 		
@@ -1466,7 +1533,7 @@ namespace Oxide.Plugins
 			public string CategoryString { get; private set; }
 			
 			public string Prefab { get; private set; }
-            public string LangKey { get; set; }
+            public string TextKey { get; set; }
             public string Suffix { get; private set; }
 			public bool IsMoveable { get; private set; }
 			public bool IsCustom { get; private set; }
@@ -1486,14 +1553,14 @@ namespace Oxide.Plugins
 				enabled = false;
 			}
 
-            public void InitializeProperties(string monumentID, MonumentCategory category, string prefab, string langKey, string suffix = "", bool isCustom = false, ulong parnetID = 0uL)
+            public void InitializeProperties(string monumentID, MonumentCategory category, string prefab, string textKey, string suffix = "", bool isCustom = false, ulong parnetID = 0uL)
             {
                 ID = monumentID;
 				ParentID = parnetID;
 				Category = category;
 				CategoryString = Category.ToString();
 				Prefab = prefab;
-                LangKey = langKey;
+                TextKey = textKey;
 				Suffix = suffix;
 				IsCustom = isCustom;
 			}
@@ -1544,7 +1611,8 @@ namespace Oxide.Plugins
 					return;
                 }
 				var entity = collider?.gameObject?.ToBaseEntity();
-				if (!entity.IsValid()) return;
+				if (!entity.IsValid())
+					return;
 				
 				bool callHook = true;
 				List<MonumentWatcher> watchers;
@@ -1554,26 +1622,31 @@ namespace Oxide.Plugins
 					bool isNpc = !player.userID.IsSteamId();
 					if (isNpc)
 					{
-						if (!NpcsList.Add(player)) return;
+						if (!NpcsList.Add(player))
+							return;
 						if (!_npcsInMonuments.TryGetValue(player.net.ID, out watchers) || watchers == null)
 							_npcsInMonuments[player.net.ID] = watchers = new List<MonumentWatcher>();
 					}
 					else
 					{
-						if (!PlayersList.Add(player)) return;
+						if (!PlayersList.Add(player))
+							return;
 						if (!_playersInMonuments.TryGetValue(player.userID, out watchers) || watchers == null)
 							_playersInMonuments[player.userID] = watchers = new List<MonumentWatcher>();
                     }
 					HandleWatcherList();
-					if (callHook) Interface.CallHook(isNpc ? Hooks_OnNpcEnteredMonument : Hooks_OnPlayerEnteredMonument, ID, player, CategoryString, oldMonumentID);
+					if (callHook)
+						Interface.CallHook(isNpc ? Hooks_OnNpcEnteredMonument : Hooks_OnPlayerEnteredMonument, ID, player, CategoryString, oldMonumentID);
 				}
                 else
 				{
-					if (!EntitiesList.Add(entity)) return;
+					if (!EntitiesList.Add(entity))
+						return;
 					if (!_entitiesInMonuments.TryGetValue(entity.net.ID, out watchers) || watchers == null)
 						_entitiesInMonuments[entity.net.ID] = watchers = new List<MonumentWatcher>();
 					HandleWatcherList();
-					if (callHook) Interface.CallHook(Hooks_OnEntityEnteredMonument, ID, entity, CategoryString, oldMonumentID);
+					if (callHook)
+						Interface.CallHook(Hooks_OnEntityEnteredMonument, ID, entity, CategoryString, oldMonumentID);
 				}
 				
 				void HandleWatcherList()
@@ -1581,22 +1654,20 @@ namespace Oxide.Plugins
 					if (watchers.Any())
                         oldMonumentID = watchers[^1].ID;
                     watchers.Add(this);
-					if (!this.IsMoveable)
+					if (this.IsMoveable)
+						return;
+					MonumentWatcher watcher;
+                    int lastIndex = watchers.Count - 1;
+                    for (int i = lastIndex; i >= 0; i--)
                     {
-						MonumentWatcher watcher;
-						int lastIndex = watchers.Count - 1;
-						for (int i = lastIndex; i >= 0; i--)
-                        {
-							watcher = watchers[i];
-                            if (watcher.IsMoveable)
-                            {
-                                watchers.RemoveAt(i);
-								watchers.Insert(lastIndex, watcher);
-								lastIndex--;
-								callHook = false;
-                            }
-                        }
-                    }
+                        watcher = watchers[i];
+						if (!watcher.IsMoveable)
+							continue;
+						watchers.RemoveAt(i);
+                        watchers.Insert(lastIndex, watcher);
+                        lastIndex--;
+                        callHook = false;
+					}
 				}
             }
 
@@ -1609,12 +1680,15 @@ namespace Oxide.Plugins
 					return;
                 }
 				var entity = collider?.gameObject?.ToBaseEntity();
-				if (!entity.IsValid()) return;
-
+				if (!entity.IsValid())
+					return;
+				
 				if (entity is BasePlayer player)
 				{
-					if (player.userID.IsSteamId()) OnPlayerExit(player, Str_Leave);
-					else OnNpcExit(player, Str_Leave);
+					if (player.userID.IsSteamId())
+						OnPlayerExit(player, Str_Leave);
+					else
+						OnNpcExit(player, Str_Leave);
 				}
 				else
 					OnEntityExit(entity, Str_Leave);
@@ -1626,11 +1700,14 @@ namespace Oxide.Plugins
 				if (_playersInMonuments.TryGetValue(player.userID, out var watchers))
                 {
 					watchers.Remove(this);
-					if (!watchers.Any()) _playersInMonuments.Remove(player.userID);
-					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase)) newMonumentID = watchers[^1].ID;
-                }
+					if (!watchers.Any())
+						_playersInMonuments.Remove(player.userID);
+					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase))
+						newMonumentID = watchers[^1].ID;
+				}
 				Interface.CallHook(Hooks_OnPlayerExitedMonument, ID, player, CategoryString, reason, newMonumentID);
-				if (remove) PlayersList.Remove(player);
+				if (remove)
+					PlayersList.Remove(player);
 			}
 			
 			public void OnNpcExit(BasePlayer player, string reason, bool remove = true)
@@ -1639,12 +1716,15 @@ namespace Oxide.Plugins
 				if (_npcsInMonuments.TryGetValue(player.net.ID, out var watchers))
 				{
 					watchers.Remove(this);
-					if (!watchers.Any()) _npcsInMonuments.Remove(player.net.ID);
-					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase)) newMonumentID = watchers[^1].ID;
+					if (!watchers.Any())
+						_npcsInMonuments.Remove(player.net.ID);
+					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase))
+						newMonumentID = watchers[^1].ID;
 				}
 				Interface.CallHook(Hooks_OnNpcExitedMonument, ID, player, CategoryString, reason, newMonumentID);
-                if (remove) NpcsList.Remove(player);
-            }
+                if (remove)
+					NpcsList.Remove(player);
+			}
 			
 			public void OnEntityExit(BaseEntity entity, string reason, bool remove = true)
             {
@@ -1652,11 +1732,14 @@ namespace Oxide.Plugins
 				if (_entitiesInMonuments.TryGetValue(entity.net.ID, out var watchers))
                 {
 					watchers.Remove(this);
-					if (!watchers.Any()) _entitiesInMonuments.Remove(entity.net.ID);
-					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase)) newMonumentID = watchers[^1].ID;
+					if (!watchers.Any())
+						_entitiesInMonuments.Remove(entity.net.ID);
+					else if (!reason.Equals(Str_Death, StringComparison.OrdinalIgnoreCase))
+						newMonumentID = watchers[^1].ID;
 				}
 				Interface.CallHook(Hooks_OnEntityExitedMonument, ID, entity, CategoryString, reason, newMonumentID);
-				if (remove) EntitiesList.Remove(entity);
+				if (remove)
+					EntitiesList.Remove(entity);
 			}
 			
 			public bool IsInBounds(Vector3 pos) => boxCollider.bounds.Contains(pos);
@@ -1681,7 +1764,8 @@ namespace Oxide.Plugins
                         if (entity.IsValid())
                             OnEntityExit(entity, Str_MonumentDestroyed, false);
                     }
-					if (ParentID > 0uL) Interface.CallHook(ID.Contains(Str_CargoShip) ? Hooks_OnCargoWatcherDeleted : Hooks_OnSpawnableWatcherDeleted, ID);
+					if (ParentID > 0uL)
+						Interface.CallHook(ID.Contains(Str_CargoShip) ? Hooks_OnCargoWatcherDeleted : Hooks_OnSpawnableWatcherDeleted, ID);
 				}
 				Pool.FreeUnmanaged(ref PlayersList);
                 Pool.FreeUnmanaged(ref NpcsList);

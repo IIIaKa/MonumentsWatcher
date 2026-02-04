@@ -101,7 +101,7 @@ Called when a **watcher is created** for a **CargoShip**.
 No return behaviour.  
 
 ```csharp
-void OnCargoWatcherCreated(string monumentID, string type)
+void OnCargoWatcherCreated(string monumentID, string type, CargoShip cargoShip)
 {
   Puts($"Watcher for monument {monumentID}({type}) has been created!");
 }
@@ -113,6 +113,28 @@ No return behaviour.
 
 ```csharp
 void OnCargoWatcherDeleted(string monumentID)
+{
+  Puts($"Watcher for monument {monumentID} has been deleted!");
+}
+```  
+
+### OnSpawnableWatcherCreated  
+Called when a **watcher is created** for a **Spawnable monument**.  
+No return behaviour.  
+
+```csharp
+void OnSpawnableWatcherCreated(string monumentID, string type, BaseEntity entity)
+{
+  Puts($"Watcher for monument {monumentID}({type}) has been created!");
+}
+```  
+
+### OnSpawnableWatcherDeleted  
+Called when a **watcher is removed** for a **Spawnable monument**.  
+No return behaviour.  
+
+```csharp
+void OnSpawnableWatcherDeleted(string monumentID)
 {
   Puts($"Watcher for monument {monumentID} has been deleted!");
 }
@@ -191,14 +213,14 @@ void OnEntityExitedMonument(string monumentID, BaseEntity entity, string type, s
 private Plugin MonumentsWatcher;
 ```  
 
-**There are 13 types of monuments:**  
+**There are 15 types of monuments:**  
 - **SafeZone**(0):  
-  - **Bandit Camp**, **Outpost**, **Fishing Village**, **Ranch** and **Large Barn**.  
+  - **Bandit Camp**, **Outpost**, **Floating City**, **Fishing Village**, **Ranch** and **Large Barn**.  
 - **RadTown**(1):  
   - **Airfield**, **Arctic Research Base**, **Abandoned Military Base**, **Giant Excavator Pit**, **Ferry Terminal**, **Harbor**, **Junkyard**, **Launch Site**;  
   - **Military Tunnel**, **Missile Silo**, **Power Plant**, **Sewer Branch**, **Satellite Dish**, **The Dome**, **Toxic Village**(Legacy Radtown), **Train Yard** and **Water Treatment Plant**.  
 - **RadTownWater**(2):  
-  - **Oil Rigs**, **Underwater Labs** and **CargoShip**.  
+  - **Oil Rigs**, **Underwater Labs**, **Cargo Ships** and **Ghost Ships**.  
 - **RadTownSmall**(3):  
   - **Lighthouse**, **Oxum's Gas Station**, **Abandoned Supermarket** and **Mining Outpost**.  
 - **TunnelStation**(4)  
@@ -209,8 +231,11 @@ private Plugin MonumentsWatcher;
 - **Swamp**(8)  
 - **IceLake**(9)  
 - **PowerSubstation**(10)  
-- **WaterWell**(11)  
-- **Custom**(12)  
+- **Ruins**(11):  
+  - **Jungle Ruins** and **Tropical Ruins**.  
+- **WaterWell**(12)  
+- **DeepSeaIsland**(13)  
+- **Custom**(14)  
 
 **There are 25 api methods:**  
 - _General:_
@@ -452,10 +477,12 @@ Returns an **empty string** on failure.
 To call the **GetNpcMonument** method, you need to pass 1 parameter:  
 1. Available options:  
   **npcPlayer** as a **BasePlayer**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer) ?? string.Empty);//(BasePlayer)npcPlayer
+(string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer.net.ID.Value) ?? string.Empty);//(ulong)netID
 (string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer.net.ID) ?? string.Empty);//(NetworkableId)netID ***recommended option***
 ```  
 
@@ -465,10 +492,12 @@ Returns **null** on failure.
 To call the **GetNpcMonuments** method, you need to pass 1 parameter:  
 1. Available options:  
   **npcPlayer** as a **BasePlayer**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer) ?? Array.Empty<string>());//(BasePlayer)npcPlayer
+(string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer.net.ID.Value) ?? Array.Empty<string>());//(ulong)netID
 (string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID ***recommended option***
 ```  
 
@@ -479,10 +508,12 @@ To call the **IsNpcInMonument** method, you need to pass 1 parameter:
 1. **monumentID** as a **string**;  
 2. Available options:  
   **npcPlayer** as a **BasePlayer**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer.net.ID) ?? false);//(NetworkableId)netID
+(bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer.net.ID.Value) ?? false);//(ulong)netID
 (bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer) ?? false);//(BasePlayer)npcPlayer ***recommended option***
 ```  
 
@@ -502,10 +533,12 @@ Returns an **empty string** on failure.
 To call the **GetEntityMonument** method, you need to pass 1 parameter:  
 1. Available options:  
   **entity** as a **BaseEntity**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetEntityMonument", entity) ?? string.Empty);//(BaseEntity)entity
+(string)(MonumentsWatcher?.Call("GetEntityMonument", entity.net.ID.Value) ?? string.Empty);//(ulong)netID
 (string)(MonumentsWatcher?.Call("GetEntityMonument", entity.net.ID) ?? string.Empty);//(NetworkableId)netID ***recommended option***
 ```  
 
@@ -515,10 +548,12 @@ Returns **null** on failure.
 To call the **GetEntityMonuments** method, you need to pass 1 parameter:  
 1. Available options:  
   **entity** as a **BaseEntity**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity) ?? Array.Empty<string>());//(BaseEntity)entity
+(string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity.net.ID.Value) ?? Array.Empty<string>());//(ulong)netID
 (string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID ***recommended option***
 ```  
 
@@ -529,9 +564,11 @@ To call the **IsEntityInMonument** method, you need to pass 1 parameter:
 1. **monumentID** as a **string**;  
 2. Available options:  
   **entity** as a **BaseEntity**;  
+  **netID** as a **ulong**;  
   **netID** as a **NetworkableId**.  
 
 ```csharp
 (bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity.net.ID) ?? false);//(NetworkableId)netID
+(bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity.net.ID.Value) ?? false);//(ulong)netID
 (bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity) ?? false);//(BaseEntity)entity ***recommended option***
 ```  
