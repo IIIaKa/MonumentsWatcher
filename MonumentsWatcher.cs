@@ -51,6 +51,7 @@ namespace Oxide.Plugins
     {
 		#region ~Variables~
         private static MonumentsWatcher Instance { get; set; }
+		private bool _isReady = false;
 		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Showtoast = "gametip.showtoast", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
 			Hooks_OnLoaded = "OnMonumentsWatcherLoaded", Hooks_OnCargoWatcherCreated = "OnCargoWatcherCreated", Hooks_OnCargoWatcherDeleted = "OnCargoWatcherDeleted",
 			Hooks_OnSpawnableWatcherCreated = "OnSpawnableWatcherCreated", Hooks_OnSpawnableWatcherDeleted = "OnSpawnableWatcherDeleted",
@@ -430,9 +431,9 @@ namespace Oxide.Plugins
             ["jungle_ruins_c"] = "Руины",
             ["jungle_ruins_d"] = "Руины",
 			["jungle_ruins_e"] = "Руины",
-			["tropical_island_dwelling_ruins_b"] = "Тропически руины",
-            ["tropical_island_dwelling_ruins_c"] = "Тропически руины",
-            ["tropical_island_dwelling_ruins_d"] = "Тропически руины",
+			["tropical_island_dwelling_ruins_b"] = "Тропические руины",
+            ["tropical_island_dwelling_ruins_c"] = "Тропические руины",
+            ["tropical_island_dwelling_ruins_d"] = "Тропические руины",
 			["water_well_a"] = "Колодец с водой",
 			["water_well_b"] = "Колодец с водой",
 			["water_well_c"] = "Колодец с водой",
@@ -625,6 +626,7 @@ namespace Oxide.Plugins
 				Subscribe(_defaultHooks[i]);
 			yield return null;
 			
+			_isReady = true;
 			Interface.CallHook(Hooks_OnLoaded, Version);
 		}
 		
@@ -852,13 +854,14 @@ namespace Oxide.Plugins
             }
             lang.RegisterMessages(langFile, this, langKey);
         }
-		#endregion
+        #endregion
 
         #region ~API~
-        private string[] GetAllMonuments() => _monumentsList.Keys.ToArray();
-		private Dictionary<string, string> GetAllMonumentsCategories() => _monumentsList.ToDictionary(watcher => watcher.Key, watcher => watcher.Value.CategoryString);
-		private string[] GetMonumentsByCategory(string category) => _monumentsList.Where(watcher => watcher.Value.CategoryString.Equals(category, StringComparison.OrdinalIgnoreCase)).Select(watcher => watcher.Key).ToArray();
-		private string GetMonumentCategory(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.CategoryString : string.Empty;
+		private object IsReady() => _isReady ? true : null;
+		private string[] GetAllMonuments() => _isReady ? _monumentsList.Keys.ToArray() : null;
+		private Dictionary<string, string> GetAllMonumentsCategories() => _isReady ? _monumentsList.ToDictionary(watcher => watcher.Key, watcher => watcher.Value.CategoryString) : null;
+		private string[] GetMonumentsByCategory(string category) => _isReady ? _monumentsList.Where(watcher => watcher.Value.CategoryString.Equals(category, StringComparison.OrdinalIgnoreCase)).Select(watcher => watcher.Key).ToArray() : null;
+		private string GetMonumentCategory(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.CategoryString : string.Empty;
 		
 		private string GetMonumentDisplayName(string monumentID, object obj, bool showSuffix = true) => GetMonumentDisplayName(monumentID, $"{obj}", showSuffix);
 		private string GetMonumentDisplayName(string monumentID, ulong userID, bool showSuffix = true) => GetMonumentDisplayName(monumentID, $"{userID}", showSuffix);
@@ -868,25 +871,29 @@ namespace Oxide.Plugins
 		
 		private string GetMonumentDisplayNameByLang(string monumentID, string langKey = "en", bool showSuffix = true)
         {
-			if (_monumentsList.TryGetValue(monumentID, out var watcher))
+			if (_isReady && _monumentsList.TryGetValue(monumentID, out var watcher))
                 return $"{lang.GetMessageByLanguage(watcher.TextKey, this, langKey)}{(showSuffix && !string.IsNullOrWhiteSpace(watcher.Suffix) ? $" {watcher.Suffix}" : string.Empty)}";
             return string.Empty;
         }
 		
-		private Vector3 GetMonumentPosition(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.transform.position : Vector3.zero;
+		private Vector3 GetMonumentPosition(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.transform.position : Vector3.zero;
 		
 		private string GetMonumentByPos(Vector3 pos)
 		{
+			if (!_isReady)
+				return null;
 			foreach (var watcher in _monumentsList.Values)
             {
-				if (watcher.IsInBounds(pos))
-					return watcher.ID;
-			}
+                if (watcher.IsInBounds(pos))
+                    return watcher.ID;
+            }
 			return string.Empty;
 		}
 		
 		private object GetMonumentsByPos(Vector3 pos)
         {
+			if (!_isReady)
+				return null;
 			var result = new List<string>();
             foreach (var watcher in _monumentsList.Values)
             {
@@ -900,6 +907,8 @@ namespace Oxide.Plugins
 		
 		private string GetClosestMonument(Vector3 pos)
         {
+			if (!_isReady)
+				return null;
 			MonumentWatcher result = null;
 			float minDistance = float.MaxValue;
 			foreach (var watcher in _monumentsList.Values)
@@ -916,32 +925,32 @@ namespace Oxide.Plugins
 		
 		private bool IsPosInMonument(string monumentID, Vector3 pos)
 		{
-			if (_monumentsList.TryGetValue(monumentID, out var watcher))
+			if (_isReady && _monumentsList.TryGetValue(monumentID, out var watcher))
 				return watcher.IsInBounds(pos);
 			return false;
 		}
 		
 		private void ShowBounds(string monumentID, BasePlayer player, float duration = 20f)
 		{
-			if (player != null && _monumentsList.TryGetValue(monumentID, out var watcher))
+			if (_isReady && player != null && _monumentsList.TryGetValue(monumentID, out var watcher))
 				ShowBounds(watcher, player, duration);
 		}
         #endregion
 
         #region ~API - Players~
-		private object GetMonumentPlayers(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.PlayersList.ToArray() : null;
+		private object GetMonumentPlayers(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.PlayersList.ToArray() : null;
 		
 		private string GetPlayerMonument(object obj) => GetPlayerMonument($"{obj}");
 		private string GetPlayerMonument(string userIDStr) => GetPlayerMonument(ulong.TryParse(userIDStr, out var userID) ? userID : 0uL);
 		private string GetPlayerMonument(BasePlayer player) => GetPlayerMonument(player.userID);
-		private string GetPlayerMonument(ulong userID) => _playersInMonuments.TryGetValue(userID, out var watchers) && watchers.Any() ? watchers[^1].ID : string.Empty;
+		private string GetPlayerMonument(ulong userID) => _isReady && _playersInMonuments.TryGetValue(userID, out var watchers) && watchers.Any() ? watchers[^1].ID : string.Empty;
 		
 		private object GetPlayerMonuments(object obj) => GetPlayerMonuments($"{obj}");
 		private object GetPlayerMonuments(string userIDStr) => GetPlayerMonuments(ulong.TryParse(userIDStr, out var userID) ? userID : 0uL);
 		private object GetPlayerMonuments(BasePlayer player) => GetPlayerMonuments(player.userID);
 		private object GetPlayerMonuments(ulong userID)
         {
-            if (_playersInMonuments.TryGetValue(userID, out var watchers) && watchers.Any())
+            if (_isReady && _playersInMonuments.TryGetValue(userID, out var watchers) && watchers.Any())
             {
 				string[] result = new string[watchers.Count];
                 for (int i = 0; i < result.Length; i++)
@@ -956,43 +965,39 @@ namespace Oxide.Plugins
         private string GetPlayerClosestMonument(ulong userID) => GetPlayerClosestMonument(BasePlayer.FindAwakeOrSleepingByID(userID));
         private string GetPlayerClosestMonument(BasePlayer player)
         {
-            if (player != null)
+			if (!_isReady || player == null)
+				return null;
+			if (_playersInMonuments.TryGetValue(player.userID, out var watchers) && watchers.Any())
+                return watchers[^1].ID;
+			MonumentWatcher result = null;
+            float minDistance = float.MaxValue;
+            var pos = player.transform.position;
+            foreach (var watcher in _monumentsList.Values)
             {
-                if (_playersInMonuments.TryGetValue(player.userID, out var watchers) && watchers.Any())
-                    return watchers[^1].ID;
-
-                MonumentWatcher result = null;
-                float minDistance = float.MaxValue;
-                var pos = player.transform.position;
-                foreach (var watcher in _monumentsList.Values)
+                float distance = (pos - watcher.transform.position).sqrMagnitude;
+                if (distance < minDistance)
                 {
-                    float distance = (pos - watcher.transform.position).sqrMagnitude;
-                    if (distance < minDistance)
-                    {
-                        minDistance = distance;
-                        result = watcher;
-                    }
+                    minDistance = distance;
+                    result = watcher;
                 }
-                if (result != null)
-                    return result.ID;
             }
-            return string.Empty;
-        }
+			return result?.ID ?? string.Empty;
+		}
 		
 		private bool IsPlayerInMonument(string monumentID, object obj) => IsPlayerInMonument(monumentID, $"{obj}");
 		private bool IsPlayerInMonument(string monumentID, string userIDStr) => IsPlayerInMonument(monumentID, ulong.TryParse(userIDStr, out var userID) ? userID : 0uL);
 		private bool IsPlayerInMonument(string monumentID, BasePlayer player) => IsPlayerInMonument(monumentID, player.userID);
-		private bool IsPlayerInMonument(string monumentID, ulong userID) => _playersInMonuments.TryGetValue(userID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
+		private bool IsPlayerInMonument(string monumentID, ulong userID) => _isReady && _playersInMonuments.TryGetValue(userID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
         #endregion
 
         #region ~API - NPCs~
-		private object GetMonumentNpcs(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.NpcsList.ToArray() : null;
+		private object GetMonumentNpcs(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.NpcsList.ToArray() : null;
 		
 		private string GetNpcMonument(BasePlayer npcPlayer) => npcPlayer.IsValid() ? GetNpcMonument(npcPlayer.net.ID) : string.Empty;
 		private string GetNpcMonument(ulong netID) => GetNpcMonument(new NetworkableId(netID));
 		private string GetNpcMonument(NetworkableId netID)
 		{
-            if (_npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
+            if (_isReady && _npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
                 return watchers[^1].ID;
             return string.Empty;
         }
@@ -1001,7 +1006,7 @@ namespace Oxide.Plugins
 		private object GetNpcMonuments(ulong netID) => GetNpcMonuments(new NetworkableId(netID));
 		private object GetNpcMonuments(NetworkableId netID)
         {
-            if (_npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
+            if (_isReady && _npcsInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
             {
 				string[] result = new string[watchers.Count];
                 for (int i = 0; i < result.Length; i++)
@@ -1013,17 +1018,17 @@ namespace Oxide.Plugins
 		
 		private bool IsNpcInMonument(string monumentID, NetworkableId netID) => IsNpcInMonument(monumentID, BaseNetworkable.serverEntities.Find(netID) as BasePlayer);
 		private bool IsNpcInMonument(string monumentID, ulong netID) => IsNpcInMonument(monumentID, BaseNetworkable.serverEntities.Find(new NetworkableId(netID)) as BasePlayer);
-		private bool IsNpcInMonument(string monumentID, BasePlayer npcPlayer) => npcPlayer.IsValid() && _npcsInMonuments.TryGetValue(npcPlayer.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
+		private bool IsNpcInMonument(string monumentID, BasePlayer npcPlayer) => _isReady && npcPlayer.IsValid() && _npcsInMonuments.TryGetValue(npcPlayer.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
         #endregion
 
         #region ~API - Entities~
-		private object GetMonumentEntities(string monumentID) => _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.EntitiesList.ToArray() : null;
+		private object GetMonumentEntities(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.EntitiesList.ToArray() : null;
 		
 		private string GetEntityMonument(BaseEntity entity) => entity.IsValid() ? GetEntityMonument(entity.net.ID) : string.Empty;
 		private string GetEntityMonument(ulong netID) => GetEntityMonument(new NetworkableId(netID));
 		private string GetEntityMonument(NetworkableId netID)
         {
-            if (_entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
+            if (_isReady && _entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
                 return watchers[^1].ID;
             return string.Empty;
         }
@@ -1032,7 +1037,7 @@ namespace Oxide.Plugins
 		private object GetEntityMonuments(ulong netID) => GetEntityMonuments(new NetworkableId(netID));
 		private object GetEntityMonuments(NetworkableId netID)
         {
-            if (_entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
+            if (_isReady && _entitiesInMonuments.TryGetValue(netID, out var watchers) && watchers.Any())
             {
 				string[] result = new string[watchers.Count];
                 for (int i = 0; i < result.Length; i++)
@@ -1044,7 +1049,7 @@ namespace Oxide.Plugins
 		
 		private bool IsEntityInMonument(string monumentID, NetworkableId netID) => IsEntityInMonument(monumentID, BaseNetworkable.serverEntities.Find(netID) as BaseEntity);
 		private bool IsEntityInMonument(string monumentID, ulong netID) => IsEntityInMonument(monumentID, BaseNetworkable.serverEntities.Find(new NetworkableId(netID)) as BaseEntity);
-		private bool IsEntityInMonument(string monumentID, BaseEntity entity) => entity.IsValid() && _entitiesInMonuments.TryGetValue(entity.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
+		private bool IsEntityInMonument(string monumentID, BaseEntity entity) => _isReady && entity.IsValid() && _entitiesInMonuments.TryGetValue(entity.net.ID, out var watchers) && _monumentsList.TryGetValue(monumentID, out var watcher) ? watchers.Contains(watcher) : false;
 		#endregion
 		
 		#region ~Oxide Hooks~
@@ -1156,6 +1161,7 @@ namespace Oxide.Plugins
 		
 		void Unload()
         {
+			_isReady = false;
 			ClearWatchers();
 			_monumentsList = null;
 			_playersInMonuments = null;

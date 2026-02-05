@@ -237,8 +237,9 @@ private Plugin MonumentsWatcher;
 - **DeepSeaIsland**(13)  
 - **Custom**(14)  
 
-**There are 25 api methods:**  
+**There are 26 api methods:**  
 - _General:_
+  - **IsReady**  
   - **GetAllMonuments**  
   - **GetAllMonumentsCategories**  
   - **GetMonumentsByCategory**  
@@ -267,6 +268,14 @@ private Plugin MonumentsWatcher;
   - **GetEntityMonument**  
   - **GetEntityMonuments**  
   - **IsEntityInMonument**  
+
+### IsReady  
+Used to check if the **MonumentsWatcher** plugin is **loaded** and **ready** to work.
+The **IsReady** method returns **true if it is ready**, or **null if it is not**.
+
+```csharp
+(bool)MonumentsWatcher?.Call("IsReady");
+```  
 
 ### GetAllMonuments  
 Used to retrieve an array of IDs for all available monuments.  
