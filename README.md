@@ -53,7 +53,7 @@ The list of all monuments can be viewed in the:
   "Version": {
     "Major": 0,
     "Minor": 1,
-    "Patch": 9
+    "Patch": 10
   }
 }
 ```  
@@ -237,7 +237,7 @@ private Plugin MonumentsWatcher;
 - **DeepSeaIsland**(13)  
 - **Custom**(14)  
 
-**There are 26 api methods:**  
+**There are 29 api methods:**  
 - _General:_
   - **IsReady**  
   - **GetAllMonuments**  
@@ -254,17 +254,20 @@ private Plugin MonumentsWatcher;
   - **ShowBounds**  
 - _Players:_  
   - **GetMonumentPlayers**  
+  - **GetMonumentPlayersNoAlloc**  
   - **GetPlayerMonument**  
   - **GetPlayerMonuments**  
   - **GetPlayerClosestMonument**  
   - **IsPlayerInMonument**  
 - _NPCs:_  
   - **GetMonumentNpcs**  
+  - **GetMonumentNpcsNoAlloc**  
   - **GetNpcMonument**  
   - **GetNpcMonuments**  
   - **IsNpcInMonument**  
 - _Entities:_  
   - **GetMonumentEntities**  
+  - **GetMonumentEntitiesNoAlloc**  
   - **GetEntityMonument**  
   - **GetEntityMonuments**  
   - **IsEntityInMonument**  
@@ -413,6 +416,18 @@ To call the **GetMonumentPlayers** method, you need to pass 1 parameter:
 (BasePlayer[])(MonumentsWatcher?.Call("GetMonumentPlayers", monumentID) ?? Array.Empty<BasePlayer>());
 ```  
 
+### GetMonumentPlayersNoAlloc  
+Used to fill your existing list with players located in the specified monument.  
+Returns **true** if at least one player is added, otherwise **null**.  
+To call the **GetMonumentPlayersNoAlloc** method, you need to pass 2 parameters:  
+1. **monumentID** as a **string**;  
+1. **list** as **List\<BasePlayer>**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", monumentID, yourList) ?? false);
+MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", monumentID, yourList);
+```  
+
 ### GetPlayerMonument  
 Used to retrieve the monument in which the specified player is located.  
 Returns an **empty string** on failure.  
@@ -480,6 +495,18 @@ To call the **GetMonumentNpcs** method, you need to pass 1 parameter:
 (BasePlayer[])(MonumentsWatcher?.Call("GetMonumentNpcs", monumentID) ?? Array.Empty<BasePlayer>());
 ```  
 
+### GetMonumentNpcsNoAlloc  
+Used to fill your existing list with npcs located in the specified monument.  
+Returns **true** if at least one npc is added, otherwise **null**.  
+To call the **GetMonumentNpcsNoAlloc** method, you need to pass 2 parameters:  
+1. **monumentID** as a **string**;  
+1. **list** as **List\<BasePlayer>**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", monumentID, yourList) ?? false);
+MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", monumentID, yourList);
+```  
+
 ### GetNpcMonument  
 Used to retrieve the monument in which the specified npc is located.  
 Returns an **empty string** on failure.  
@@ -534,6 +561,18 @@ To call the **GetMonumentEntities** method, you need to pass 1 parameter:
 
 ```csharp
 (BaseEntity[])(MonumentsWatcher?.Call("GetMonumentEntities", monumentID) ?? Array.Empty<BaseEntity>());
+```  
+
+### GetMonumentEntitiesNoAlloc  
+Used to fill your existing list with entities located in the specified monument.  
+Returns **true** if at least one entity is added, otherwise **null**.  
+To call the **GetMonumentEntitiesNoAlloc** method, you need to pass 2 parameters:  
+1. **monumentID** as a **string**;  
+1. **list** as **List\<BaseEntity>**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", monumentID, yourList) ?? false);
+MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", monumentID, yourList);
 ```  
 
 ### GetEntityMonument  

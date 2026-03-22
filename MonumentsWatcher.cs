@@ -31,6 +31,7 @@
 *  Copyright © 2024-2026 IIIaKa
 */
 
+using HarmonyLib;
 using System;
 using System.IO;
 using System.Linq;
@@ -45,14 +46,15 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-	[Info("Monuments Watcher", "IIIaKa", "0.1.9")]
+	[Info("Monuments Watcher", "IIIaKa", "0.1.10")]
 	[Description("A plugin that allows other plugins to interact with players and entities in monuments via API.")]
 	class MonumentsWatcher : RustPlugin
     {
 		#region ~Variables~
         private static MonumentsWatcher Instance { get; set; }
 		private bool _isReady = false;
-		private const string PERMISSION_ADMIN = "monumentswatcher.admin", Str_Showtoast = "gametip.showtoast", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
+		private Harmony _harmony;
+		private const string IdForHarmony = "iiiaka.monumentswatcher", PERMISSION_ADMIN = "monumentswatcher.admin", Str_Leave = "leave", Str_Death = "death", Str_MonumentDestroyed = "monument_destroyed", Str_CargoShip = "CargoShip",
 			Hooks_OnLoaded = "OnMonumentsWatcherLoaded", Hooks_OnCargoWatcherCreated = "OnCargoWatcherCreated", Hooks_OnCargoWatcherDeleted = "OnCargoWatcherDeleted",
 			Hooks_OnSpawnableWatcherCreated = "OnSpawnableWatcherCreated", Hooks_OnSpawnableWatcherDeleted = "OnSpawnableWatcherDeleted",
 			Hooks_OnPlayerEnteredMonument = "OnPlayerEnteredMonument", Hooks_OnNpcEnteredMonument = "OnNpcEnteredMonument", Hooks_OnEntityEnteredMonument = "OnEntityEnteredMonument",
@@ -155,7 +157,7 @@ namespace Oxide.Plugins
 			["CmdMainRotateNotFound"] = "You must be inside a monument and looking in the correct direction, or specify the name or ID of the monument along with the Y-coordinate for direction",
 			["CmdMainRotated"] = "Successful rotation of the {0} by Y-coordinate({1})!",
 			["CmdMainRecreated"] = "The boundaries of the monuments have been successfully recreated!",
-			["CargoShip"] = "CargoShip",
+			[Str_CargoShip] = "CargoShip",
 			["airfield_1"] = "Airfield",
 			["airfield_1_station"] = "Airfield Station",
 			["arctic_research_base_a"] = "Arctic Research Base",
@@ -310,7 +312,7 @@ namespace Oxide.Plugins
 			["CmdMainRotateNotFound"] = "Вы должны находиться в монументе и смотреть в нужном направлении, либо указать имя или ID монумента и Y-координату для направления",
 			["CmdMainRotated"] = "Успешный поворот у {0} по Y координате({1})!",
 			["CmdMainRecreated"] = "Границы монументов успешно пересозданы!",
-			["CargoShip"] = "Грузовой корабль",
+			[Str_CargoShip] = "Грузовой корабль",
 			["airfield_1"] = "Аэропорт",
 			["airfield_1_station"] = "Станция Аэропорт",
 			["arctic_research_base_a"] = "Арктическая база",
@@ -451,6 +453,21 @@ namespace Oxide.Plugins
 			ClearWatchers();
 			yield return null;
 			
+			string monumentKey, prefab;
+			var customIds = new Dictionary<MonumentInfo, string>();
+            foreach (var kvp in World.SpawnedPrefabs)
+            {
+                foreach (var go in kvp.Value)
+                {
+					if (go == null || !go.name.EndsWith("monument_marker.prefab") || !go.TryGetComponent(out MonumentInfo monument))
+						continue;
+					monumentKey = System.Text.RegularExpressions.Regex.Replace(kvp.Key.Replace(" ", "_"), @"[^\w\d_]", string.Empty).ToLowerInvariant();
+					if (!string.IsNullOrWhiteSpace(monumentKey))
+						customIds[monument] = monumentKey;
+				}
+			}
+			yield return null;
+			
 			foreach (var entity in BaseNetworkable.serverEntities)
             {
 				if (!entity.IsValid())
@@ -471,19 +488,17 @@ namespace Oxide.Plugins
 			}
 			yield return null;
 			
-			string monumentKey, prefab;
 			int miningoutpost = 0, lighthouse = 0, gasstation = 0, supermarket = 0, tunnel = 0, bunker = 0, cave = 0, icelake = 0, power = 0, waterwell = 0;
 			foreach (var monument in TerrainMeta.Path.Monuments)
             {
 				prefab = monument.name.ToLower();
-				if (prefab.Contains("monument_marker.prefab", StringComparison.OrdinalIgnoreCase))
+				if (prefab.EndsWith("monument_marker.prefab"))
                 {
-					monumentKey = monument.transform.root.name.ToLower();
-					monumentKey = System.Text.RegularExpressions.Regex.Replace(monumentKey, @"[^\w\d]", string.Empty);
-					if (!string.IsNullOrWhiteSpace(monumentKey))
-						CreateCustomWatcher(monumentKey, monument.transform, prefab, monument.transform.root.name);
+					if (customIds.TryGetValue(monument, out monumentKey))
+						CreateCustomWatcher(monumentKey, monument.transform, prefab, monumentKey);
 					continue;
                 }
+				
 				monumentKey = ClearMonumentName(prefab);
 				if (!_defaultBoundsValues.ContainsKey(monumentKey))
 					continue;
@@ -620,8 +635,13 @@ namespace Oxide.Plugins
 			for (int i = 0; i < _config.LanguageKeys.Count; i++)
                 HandleLanguageFile(_enLang, _config.LanguageKeys[i]);
             HandleLanguageFile(_ruLang, "ru");
-            _enLang.Clear();
-            _ruLang.Clear();
+			_enLang.Clear();
+			_ruLang.Clear();
+			
+			_harmony = new Harmony(IdForHarmony);
+			_harmony.Patch(AccessTools.Method(typeof(ConVar.DeepSea), "enterdeepsea"), postfix: new HarmonyMethod(typeof(MonumentsWatcher), nameof(ModEnterDeepSea), new Type[] { typeof(ConsoleSystem.Arg) }));
+			_harmony.Patch(AccessTools.Method(typeof(ConVar.DeepSea), "leavedeepsea"), postfix: new HarmonyMethod(typeof(MonumentsWatcher), nameof(ModLeaveDeepSea), new Type[] { typeof(ConsoleSystem.Arg) }));
+			
 			for (int i = 0; i < _defaultHooks.Length; i++)
 				Subscribe(_defaultHooks[i]);
 			yield return null;
@@ -662,7 +682,7 @@ namespace Oxide.Plugins
 		
 		private void CreateCustomWatcher(string monumentID, Transform transform, string prefab, string displayName)
         {
-            _enLang[$"custom_{monumentID}"] = displayName;
+			_enLang[$"custom_{monumentID}"] = displayName;
             _ruLang[$"custom_{monumentID}"] = displayName;
             if (!_customMonumentsBounds.TryGetValue(monumentID, out var bounds) || bounds == null)
             {
@@ -823,7 +843,7 @@ namespace Oxide.Plugins
 		private static void SendMessage(IPlayer player, string message, bool isWarning = true)
         {
             if (_config.GameTips_Enabled && !player.IsServer)
-                player.Command(Str_Showtoast, (int)(isWarning ? GameTip.Styles.Error : GameTip.Styles.Blue_Long), message, string.Empty);
+                player.Command("gametip.showtoast", (int)(isWarning ? GameTip.Styles.Error : GameTip.Styles.Blue_Long), message, string.Empty);
             else
                 player.Reply(message);
         }
@@ -939,6 +959,15 @@ namespace Oxide.Plugins
 
         #region ~API - Players~
 		private object GetMonumentPlayers(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.PlayersList.ToArray() : null;
+		private object GetMonumentPlayersNoAlloc(string monumentID, List<BasePlayer> list)
+		{
+			if (_isReady && _monumentsList.TryGetValue(monumentID, out var watcher) && watcher.PlayersList.Count > 0)
+			{
+				list.AddRange(watcher.PlayersList);
+				return true;
+			}
+			return null;
+		}
 		
 		private string GetPlayerMonument(object obj) => GetPlayerMonument($"{obj}");
 		private string GetPlayerMonument(string userIDStr) => GetPlayerMonument(ulong.TryParse(userIDStr, out var userID) ? userID : 0uL);
@@ -992,6 +1021,15 @@ namespace Oxide.Plugins
 
         #region ~API - NPCs~
 		private object GetMonumentNpcs(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.NpcsList.ToArray() : null;
+		private object GetMonumentNpcsNoAlloc(string monumentID, List<BasePlayer> list)
+        {
+            if (_isReady && _monumentsList.TryGetValue(monumentID, out var watcher) && watcher.NpcsList.Count > 0)
+            {
+                list.AddRange(watcher.NpcsList);
+                return true;
+            }
+            return null;
+        }
 		
 		private string GetNpcMonument(BasePlayer npcPlayer) => npcPlayer.IsValid() ? GetNpcMonument(npcPlayer.net.ID) : string.Empty;
 		private string GetNpcMonument(ulong netID) => GetNpcMonument(new NetworkableId(netID));
@@ -1023,6 +1061,15 @@ namespace Oxide.Plugins
 
         #region ~API - Entities~
 		private object GetMonumentEntities(string monumentID) => _isReady && _monumentsList.TryGetValue(monumentID, out var watcher) ? watcher.EntitiesList.ToArray() : null;
+		private object GetMonumentEntitiesNoAlloc(string monumentID, List<BaseEntity> list)
+        {
+            if (_isReady && _monumentsList.TryGetValue(monumentID, out var watcher) && watcher.EntitiesList.Count > 0)
+            {
+                list.AddRange(watcher.EntitiesList);
+                return true;
+            }
+            return null;
+        }
 		
 		private string GetEntityMonument(BaseEntity entity) => entity.IsValid() ? GetEntityMonument(entity.net.ID) : string.Empty;
 		private string GetEntityMonument(ulong netID) => GetEntityMonument(new NetworkableId(netID));
@@ -1113,18 +1160,7 @@ namespace Oxide.Plugins
 			}
 		}
 		
-		void OnPlayerTeleported(BasePlayer player, Vector3 oldPos, Vector3 newPos)
-        {
-			if (!_playersInMonuments.TryGetValue(player.userID, out var watchers))
-				return;
-			MonumentWatcher watcher;
-            for (int i = watchers.Count - 1; i >= 0; i--)
-            {
-                watcher = watchers[i];
-                if (watcher != null && watcher.IsInBounds(oldPos) && !watcher.IsInBounds(newPos))
-                    watcher.OnPlayerExit(player, Str_Leave);
-            }
-		}
+		void OnPlayerTeleported(BasePlayer player, Vector3 oldPos, Vector3 newPos) => HandleTeleport(player);
 		
 		void Init()
         {
@@ -1161,8 +1197,9 @@ namespace Oxide.Plugins
 		
 		void Unload()
         {
-			_isReady = false;
+			_harmony?.UnpatchAll(IdForHarmony);
 			ClearWatchers();
+			_isReady = false;
 			_monumentsList = null;
 			_playersInMonuments = null;
 			_npcsInMonuments = null;
@@ -1293,8 +1330,8 @@ namespace Oxide.Plugins
 				array ??= new string[] { $"{Name}{Path.DirectorySeparatorChar}MonumentsBounds" };
                 for (int i = 0; i < array.Length; i++)
                     Interface.Oxide.DataFileSystem.DeleteDataFile(array[i]);
-                InitMonuments();
-                SendMessage(player, lang.GetMessage("CmdMainRecreated", this, player.Id), false);
+				ServerMgr.Instance.StartCoroutine(InitMonuments());
+				SendMessage(player, lang.GetMessage("CmdMainRecreated", this, player.Id), false);
             }
 			else
 				goto notValid;
@@ -1366,7 +1403,7 @@ namespace Oxide.Plugins
 				{ "deepsea_floatingcity3", new BoundsValues(new Vector3(22.5f, 40f, -40f), new Vector3(300f, 150f, 220f)) },
 				{ "deepsea_floatingcity4", new BoundsValues(new Vector3(-2f, 40f, 7f), new Vector3(250f, 150f, 250f)) },
 				{ "deepsea_island_tropical1", new BoundsValues(new Vector3(-5f, 15f, 55f), new Vector3(300f, 120f, 250f)) },
-				{ "deepsea_island_tropical2", new BoundsValues(new Vector3(35f, 15f, -80f), new Vector3(3300f, 120f, 300f)) },
+				{ "deepsea_island_tropical2", new BoundsValues(new Vector3(35f, 15f, -80f), new Vector3(330f, 120f, 300f)) },
 				{ "deepsea_island_tropical3", new BoundsValues(new Vector3(-15f, 15f, 30f), new Vector3(200f, 120f, 160f)) },
 				{ "deepsea_island_tropical4", new BoundsValues(new Vector3(-25f, 15f, 10f), new Vector3(260f, 120f, 300f)) },
 				{ "desert_military_base_a", new BoundsValues(new Vector3(0f, 15f, 3f), new Vector3(100f, 80f, 100f)) },
@@ -1530,6 +1567,38 @@ namespace Oxide.Plugins
 			DeepSeaIsland,
 			Custom
         }
+		
+		public static void ModEnterDeepSea(ConsoleSystem.Arg arg)
+        {
+			if (Instance == null)
+				return;
+			var player = ArgEx.Player(arg);
+			if (player != null)
+				Instance.HandleTeleport(player);
+		}
+		
+		public static void ModLeaveDeepSea(ConsoleSystem.Arg arg)
+        {
+            if (Instance == null)
+                return;
+            var player = ArgEx.Player(arg);
+            if (player != null)
+                Instance.HandleTeleport(player);
+        }
+		
+		private void HandleTeleport(BasePlayer player)
+		{
+			if (!_playersInMonuments.TryGetValue(player.userID, out var watchers))
+				return;
+			MonumentWatcher watcher;
+			var pos = player.transform.position;
+			for (int i = watchers.Count - 1; i >= 0; i--)
+            {
+                watcher = watchers[i];
+                if (watcher != null && !watcher.IsInBounds(pos))
+					watcher.OnPlayerExit(player, Str_Leave);
+			}
+		}
 		
 		public class MonumentWatcher : MonoBehaviour
 		{
