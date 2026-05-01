@@ -53,7 +53,7 @@ The list of all monuments can be viewed in the:
   "Version": {
     "Major": 0,
     "Minor": 1,
-    "Patch": 10
+    "Patch": 11
   }
 }
 ```  
@@ -101,9 +101,9 @@ Called when a **watcher is created** for a **CargoShip**.
 No return behaviour.  
 
 ```csharp
-void OnCargoWatcherCreated(string monumentID, string type, CargoShip cargoShip)
+void OnCargoWatcherCreated(string monumentID, string category, CargoShip cargoShip)
 {
-  Puts($"Watcher for monument {monumentID}({type}) has been created!");
+  Puts($"Watcher for monument '{monumentID}'({category}) has been created!");
 }
 ```  
 
@@ -114,7 +114,7 @@ No return behaviour.
 ```csharp
 void OnCargoWatcherDeleted(string monumentID)
 {
-  Puts($"Watcher for monument {monumentID} has been deleted!");
+  Puts($"Watcher for monument '{monumentID}' has been deleted!");
 }
 ```  
 
@@ -123,9 +123,9 @@ Called when a **watcher is created** for a **Spawnable monument**.
 No return behaviour.  
 
 ```csharp
-void OnSpawnableWatcherCreated(string monumentID, string type, BaseEntity entity)
+void OnSpawnableWatcherCreated(string monumentID, string category, BaseEntity entity)
 {
-  Puts($"Watcher for monument {monumentID}({type}) has been created!");
+  Puts($"Watcher for monument '{monumentID}'({category}) has been created!");
 }
 ```  
 
@@ -136,7 +136,7 @@ No return behaviour.
 ```csharp
 void OnSpawnableWatcherDeleted(string monumentID)
 {
-  Puts($"Watcher for monument {monumentID} has been deleted!");
+  Puts($"Watcher for monument '{monumentID}' has been deleted!");
 }
 ```  
 
@@ -145,9 +145,9 @@ Called when a **player enters** any monument.
 No return behaviour.  
 
 ```csharp
-void OnPlayerEnteredMonument(string monumentID, BasePlayer player, string type, string oldMonumentID)
+void OnPlayerEnteredMonument(string monumentID, BasePlayer player, string category, string oldMonumentID)
 {
-  Puts($"{player.displayName} entered to {monumentID}({type}). His previous monument was {oldMonumentID}");
+  Puts($"Player '{player.displayName}' entered to '{monumentID}'({category}). His previous monument was '{oldMonumentID}'.");
 }
 ```  
 
@@ -156,9 +156,30 @@ Called when an **NPC player enters** any monument.
 No return behaviour.  
 
 ```csharp
-void OnNpcEnteredMonument(string monumentID, BasePlayer npcPlayer, string type, string oldMonumentID)
+void OnNpcEnteredMonument(string monumentID, BaseNPC2 npcPlayer, string category, string oldMonumentID)
 {
-  Puts($"Npc({npcPlayer.displayName}) entered to {monumentID}({type}). Previous monument was {oldMonumentID}");
+  Puts($"Npc '{npcPlayer.displayName}'({npcPlayer.GetType()}) entered to '{monumentID}'({category}). Previous monument was '{oldMonumentID}'.");
+}
+
+void OnNpcEnteredMonument(string monumentID, BasePlayer npcPlayer, string category, string oldMonumentID)
+{
+  Puts($"Npc '{npcPlayer.displayName}'({npcPlayer.GetType()}) entered to '{monumentID}'({category}). Previous monument was '{oldMonumentID}'.");
+}
+```  
+
+### OnAnimalEnteredMonument  
+Called when an **Animal enters** any monument.  
+No return behaviour.  
+
+```csharp
+void OnAnimalEnteredMonument(string monumentID, BaseNPC2 animal, string category, string oldMonumentID)
+{
+  Puts($"Animal '{animal.displayName}'({animal.GetType()}) entered to '{monumentID}'({category}). Previous monument was '{oldMonumentID}'.");
+}
+
+void OnAnimalEnteredMonument(string monumentID, BaseAnimalNPC animal, string category, string oldMonumentID)
+{
+  Puts($"Animal '{animal.net.ID.Value}'({animal.GetType()}) entered to '{monumentID}'({category}). Previous monument was '{oldMonumentID}'.");
 }
 ```  
 
@@ -167,9 +188,9 @@ Called when any other **BaseEntity enters** any monument.
 No return behaviour.  
 
 ```csharp
-void OnEntityEnteredMonument(string monumentID, BaseEntity entity, string type, string oldMonumentID)
+void OnEntityEnteredMonument(string monumentID, BaseEntity entity, string category, string oldMonumentID)
 {
-  Puts($"Entity({entity.net.ID}) entered to {monumentID}({type}). Previous monument was {oldMonumentID}");
+  Puts($"Entity '{entity.net.ID.Value}'({entity.GetType()}) entered to '{monumentID}'({category}). Previous monument was '{oldMonumentID}'.");
 }
 ```  
 
@@ -178,9 +199,9 @@ Called when a **player exits** any monument.
 No return behaviour.  
 
 ```csharp
-void OnPlayerExitedMonument(string monumentID, BasePlayer player, string type, string reason, string newMonumentID)
+void OnPlayerExitedMonument(string monumentID, BasePlayer player, string category, string reason, string newMonumentID)
 {
-  Puts($"{player.displayName} left from {monumentID}({type}). Reason: {reason}. They are now at '{newMonumentID}'.");
+  Puts($"Player '{player.displayName}' left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
 }
 ```  
 
@@ -189,9 +210,30 @@ Called when an **NPC player exits** any monument.
 No return behaviour.  
 
 ```csharp
-void OnNpcExitedMonument(string monumentID, BasePlayer npcPlayer, string type, string reason, string newMonumentID)
+void OnNpcExitedMonument(string monumentID, BaseNPC2 npcPlayer, string category, string reason, string newMonumentID)
 {
-  Puts($"Npc({npcPlayer.displayName}) left from {monumentID}({type}). Reason: {reason}. They are now in {newMonumentID}");
+  Puts($"Npc '{npcPlayer.displayName}'({npcPlayer.GetType()}) left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
+}
+
+void OnNpcExitedMonument(string monumentID, BasePlayer npcPlayer, string category, string reason, string newMonumentID)
+{
+  Puts($"Npc '{npcPlayer.displayName}'({npcPlayer.GetType()}) left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
+}
+```  
+
+### OnAnimalExitedMonument  
+Called when an **Animal exits** any monument.  
+No return behaviour.  
+
+```csharp
+void OnAnimalExitedMonument(string monumentID, BaseNPC2 animal, string category, string reason, string newMonumentID)
+{
+  Puts($"Animal '{animal.displayName}'({animal.GetType()}) left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
+}
+
+void OnAnimalExitedMonument(string monumentID, BaseAnimalNPC animal, string category, string reason, string newMonumentID)
+{
+  Puts($"Animal '{animal.net.ID.Value}'({animal.GetType()}) left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
 }
 ```  
 
@@ -200,9 +242,9 @@ Called when any other **BaseEntity exits** any monument.
 No return behaviour.  
 
 ```csharp
-void OnEntityExitedMonument(string monumentID, BaseEntity entity, string type, string reason, string newMonumentID)
+void OnEntityExitedMonument(string monumentID, BaseEntity entity, string category, string reason, string newMonumentID)
 {
-  Puts($"Entity({entity.net.ID}) left from {monumentID}({type}). Reason: {reason}. They are now in {newMonumentID}");
+  Puts($"Entity '{entity.net.ID.Value}'({entity.GetType()}) left from '{monumentID}'({category}). Reason: '{reason}'. New monument is: '{newMonumentID}'.");
 }
 ```  
 
@@ -213,7 +255,7 @@ void OnEntityExitedMonument(string monumentID, BaseEntity entity, string type, s
 private Plugin MonumentsWatcher;
 ```  
 
-**There are 15 types of monuments:**  
+**There are 15 categories of monuments:**  
 - **SafeZone**(0):  
   - **Bandit Camp**, **Outpost**, **Floating City**, **Fishing Village**, **Ranch** and **Large Barn**.  
 - **RadTown**(1):  
@@ -237,18 +279,22 @@ private Plugin MonumentsWatcher;
 - **DeepSeaIsland**(13)  
 - **Custom**(14)  
 
-**There are 29 api methods:**  
+**There are 42 api methods:**  
 - _General:_
   - **IsReady**  
   - **GetAllMonuments**  
-  - **GetAllMonumentsCategories**  
+  - **GetAllMonumentsNoAlloc**  
+  - **GetAllMonumentsWithCategories**  
+  - **GetAllMonumentsWithCategoriesNoAlloc**  
   - **GetMonumentsByCategory**  
+  - **GetMonumentsByCategoryNoAlloc**  
   - **GetMonumentCategory**  
   - **GetMonumentDisplayName**  
   - **GetMonumentDisplayNameByLang**  
   - **GetMonumentPosition**  
   - **GetMonumentByPos**  
   - **GetMonumentsByPos**  
+  - **GetMonumentsByPosNoAlloc**  
   - **GetClosestMonument**  
   - **IsPosInMonument**  
   - **ShowBounds**  
@@ -257,6 +303,7 @@ private Plugin MonumentsWatcher;
   - **GetMonumentPlayersNoAlloc**  
   - **GetPlayerMonument**  
   - **GetPlayerMonuments**  
+  - **GetPlayeronumentsNoAlloc**  
   - **GetPlayerClosestMonument**  
   - **IsPlayerInMonument**  
 - _NPCs:_  
@@ -264,20 +311,29 @@ private Plugin MonumentsWatcher;
   - **GetMonumentNpcsNoAlloc**  
   - **GetNpcMonument**  
   - **GetNpcMonuments**  
+  - **GetNpcMonumentsNoAlloc**  
   - **IsNpcInMonument**  
+- _Animals:_  
+  - **GetMonumentAnimals**  
+  - **GetMonumentAnimalsNoAlloc**  
+  - **GetAnimalMonument**  
+  - **GetAnimalMonuments**  
+  - **GetAnimalMonumentsNoAlloc**  
+  - **IsAnimalInMonument**  
 - _Entities:_  
   - **GetMonumentEntities**  
   - **GetMonumentEntitiesNoAlloc**  
   - **GetEntityMonument**  
   - **GetEntityMonuments**  
+  - **GetEntityMonumentsNoAlloc**  
   - **IsEntityInMonument**  
 
 ### IsReady  
 Used to check if the **MonumentsWatcher** plugin is **loaded** and **ready** to work.
-The **IsReady** method returns **true if it is ready**, or **null if it is not**.
+Returns **true** if plugin is ready, otherwise **null**.
 
 ```csharp
-(bool)MonumentsWatcher?.Call("IsReady");
+(bool)(MonumentsWatcher?.Call("IsReady") ?? false);
 ```  
 
 ### GetAllMonuments  
@@ -287,11 +343,33 @@ Used to retrieve an array of IDs for all available monuments.
 (string[])(MonumentsWatcher?.Call("GetAllMonuments") ?? Array.Empty<string>());
 ```  
 
-### GetAllMonumentsCategories  
+### GetAllMonumentsNoAlloc  
+Used to fill your existing list with monument IDs.  
+Returns **true** if at least one monument is added, otherwise **null**.  
+To call the **GetAllMonumentsNoAlloc** method, you need to pass 1 parameter:  
+1. **list** as **List\<string>**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetAllMonumentsNoAlloc", yourList) ?? false);
+MonumentsWatcher?.Call("GetAllMonumentsNoAlloc", yourList);
+```  
+
+### GetAllMonumentsWithCategories  
 Used to retrieve a dictionary of IDs and categories for all available monuments.  
 
  ```csharp
-(Dictionary<string, string>)(MonumentsWatcher?.Call("GetAllMonumentsCategories") ?? new Dictionary<string, string>());
+(Dictionary<string, string>)(MonumentsWatcher?.Call("GetAllMonumentsWithCategories") ?? new Dictionary<string, string>());
+```  
+
+### GetAllMonumentsWithCategoriesNoAlloc  
+Used to fill your existing dictionary with monument IDs(key) and their category(value).  
+Returns **true** if at least one monument is added, otherwise **null**.  
+To call the **GetAllMonumentsWithCategoriesNoAlloc** method, you need to pass 1 parameter:  
+1. **dictionary** as **Dictionary\<string, string>**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetAllMonumentsWithCategoriesNoAlloc", yourDictionary) ?? false);
+MonumentsWatcher?.Call("GetAllMonumentsWithCategoriesNoAlloc", yourDictionary);
 ```  
 
 ### GetMonumentsByCategory  
@@ -301,6 +379,18 @@ To call the **GetMonumentsByCategory** method, you need to pass 1 parameter:
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetMonumentsByCategory", "SafeZone") ?? Array.Empty<string>());
+```  
+
+### GetMonumentsByCategoryNoAlloc  
+Used to fill your existing list with monument IDs by specified category.  
+Returns **true** if at least one monument is added, otherwise **null**.  
+To call the **GetMonumentsByCategoryNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **monument category** as a **string**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentsByCategoryNoAlloc", yourList, "SafeZone") ?? false);
+MonumentsWatcher?.Call("GetMonumentsByCategoryNoAlloc", yourList, "SafeZone");
 ```  
 
 ### GetMonumentCategory  
@@ -318,15 +408,15 @@ Used to retrieve the nicename of a monument in the player's language.
 Returns an **empty string** on failure.  
 To call the **GetMonumentDisplayName** method, you need to pass 3 parameters:  
 1. **monumentID** as a **string**;  
-2. Available options:  
-  **userID** as a **ulong** or a **string**;  
+2. **Player**, available options:  
+  **userID** as a **ulong** or a **string**(recommended);  
   **player** as a **BasePlayer** or an **IPlayer**.  
 3. **displaySuffix** as a **bool**. Should the suffix be displayed in the name if there are multiple such monuments? This parameter is **optional**.  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetMonumentDisplayName", monumentID, player.userID, true) ?? string.Empty);//(ulong)userID
 (string)(MonumentsWatcher?.Call("GetMonumentDisplayName", monumentID, player, true) ?? string.Empty);//(BasePlayer/IPlayer)player
-(string)(MonumentsWatcher?.Call("GetMonumentDisplayName", monumentID, player.UserIDString, true) ?? string.Empty);//(string)userID ***recommended option***
+(string)(MonumentsWatcher?.Call("GetMonumentDisplayName", monumentID, player.UserIDString, true) ?? string.Empty);//(string)userID
 ```  
 
 ### GetMonumentDisplayNameByLang  
@@ -370,6 +460,18 @@ To call the **GetMonumentsByPos** method, you need to pass 1 parameter:
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetMonumentsByPos", pos) ?? Array.Empty<string>());
+```  
+
+### GetMonumentsByPosNoAlloc  
+Used to fill your existing list with monument IDs by specified position.  
+Returns **true** if at least one monument is added, otherwise **null**.  
+To call the **GetMonumentsByPosNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **position** as a **Vector3**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentsByPosNoAlloc", yourList, pos) ?? false);
+MonumentsWatcher?.Call("GetMonumentsByPosNoAlloc", yourList, pos);
 ```  
 
 ### GetClosestMonument  
@@ -420,54 +522,68 @@ To call the **GetMonumentPlayers** method, you need to pass 1 parameter:
 Used to fill your existing list with players located in the specified monument.  
 Returns **true** if at least one player is added, otherwise **null**.  
 To call the **GetMonumentPlayersNoAlloc** method, you need to pass 2 parameters:  
-1. **monumentID** as a **string**;  
-1. **list** as **List\<BasePlayer>**.  
+1. **list** as **List\<BasePlayer>**;  
+2. **monumentID** as a **string**.  
 
 ```csharp
-(bool)(MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", monumentID, yourList) ?? false);
-MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", monumentID, yourList);
+(bool)(MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", yourList, monumentID) ?? false);
+MonumentsWatcher?.Call("GetMonumentPlayersNoAlloc", yourList, monumentID);
 ```  
 
 ### GetPlayerMonument  
 Used to retrieve the monument in which the specified player is located.  
 Returns an **empty string** on failure.  
 To call the **GetPlayerMonument** method, you need to pass 1 parameter:  
-1. Available options:  
+1. **Player**, available options:  
   **player** as a **BasePlayer**;  
-  **userID** as a **ulong** or a **string**.  
+  **userID** as a **ulong**(recommended) or a **string**.  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetPlayerMonument", player.UserIDString) ?? string.Empty);//(string)userID
 (string)(MonumentsWatcher?.Call("GetPlayerMonument", player) ?? string.Empty);//(BasePlayer)player
-(string)(MonumentsWatcher?.Call("GetPlayerMonument", player.userID) ?? string.Empty);//(ulong)userID ***recommended option***
+(string)(MonumentsWatcher?.Call("GetPlayerMonument", player.userID) ?? string.Empty);//(ulong)userID
 ```  
 
 ### GetPlayerMonuments  
 Used to retrieve all monuments in which the specified player is located.  
 Returns **null** on failure.  
 To call the **GetPlayerMonuments** method, you need to pass 1 parameter:  
-1. Available options:  
+1. **Player**, available options:  
   **player** as a **BasePlayer**;  
-  **userID** as a **ulong** or a **string**.  
+  **userID** as a **ulong**(recommended) or a **string**.  
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetPlayerMonuments", player.UserIDString) ?? Array.Empty<string>());//(string)userID
 (string[])(MonumentsWatcher?.Call("GetPlayerMonuments", player) ?? Array.Empty<string>());//(BasePlayer)player
-(string[])(MonumentsWatcher?.Call("GetPlayerMonuments", player.userID) ?? Array.Empty<string>());//(ulong)userID ***recommended option***
+(string[])(MonumentsWatcher?.Call("GetPlayerMonuments", player.userID) ?? Array.Empty<string>());//(ulong)userID
+```  
+
+### GetPlayerMonumentsNoAlloc  
+Used to fill your existing list with players located in the specified monument.  
+Returns **true** if at least one player is added, otherwise **null**.  
+To call the **GetPlayerMonumentsNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **Player**, available options:  
+  **player** as a **BasePlayer**;  
+  **userID** as a **ulong**(recommended) or a **string**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetPlayerMonumentsNoAlloc", yourList, player.userID) ?? false);
+MonumentsWatcher?.Call("GetPlayerMonumentsNoAlloc", yourList, player.userID);
 ```  
 
 ### GetPlayerClosestMonument  
 Used to retrieve the nearest monument to the specified player.  
 Returns an **empty string** on failure.  
 To call the **GetPlayerClosestMonument** method, you need to pass 1 parameter:  
-1. Available options:  
-  **player** as a **BasePlayer**;  
+1. **Player**, available options:  
+  **player** as a **BasePlayer**(recommended);  
   **userID** as a **ulong** or a **string**.  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetPlayerClosestMonument", player.UserIDString) ?? string.Empty);//(string)userID
 (string)(MonumentsWatcher?.Call("GetPlayerClosestMonument", player.userID) ?? string.Empty);//(ulong)userID
-(string)(MonumentsWatcher?.Call("GetPlayerClosestMonument", player) ?? string.Empty);//(BasePlayer)player ***recommended option***
+(string)(MonumentsWatcher?.Call("GetPlayerClosestMonument", player) ?? string.Empty);//(BasePlayer)player
 ```  
 
 ### IsPlayerInMonument  
@@ -475,14 +591,14 @@ Used to check whether the specified player is in the specified monument.
 Returns a **false** on failure.  
 To call the **IsPlayerInMonument** method, you need to pass 1 parameter:  
 1. **monumentID** as a **string**;  
-2. Available options:  
+2. **Player**, available options:  
   **player** as a **BasePlayer**;  
-  **userID** as a **ulong** or a **string**.  
+  **userID** as a **ulong**(recommended) or a **string**.  
 
 ```csharp
 (bool)(MonumentsWatcher?.Call("IsPlayerInMonument", monumentID, player.UserIDString) ?? false);//(string)userID
 (bool)(MonumentsWatcher?.Call("IsPlayerInMonument", monumentID, player) ?? false);//(BasePlayer)player
-(bool)(MonumentsWatcher?.Call("IsPlayerInMonument", monumentID, player.userID) ?? false);//(ulong)userID ***recommended option***
+(bool)(MonumentsWatcher?.Call("IsPlayerInMonument", monumentID, player.userID) ?? false);//(ulong)userID
 ```  
 
 ### GetMonumentNpcs  
@@ -492,49 +608,65 @@ To call the **GetMonumentNpcs** method, you need to pass 1 parameter:
 1. **monumentID** as a **string**.  
 
 ```csharp
-(BasePlayer[])(MonumentsWatcher?.Call("GetMonumentNpcs", monumentID) ?? Array.Empty<BasePlayer>());
+(BaseNPC2[])(MonumentsWatcher?.Call("GetMonumentNpcs", monumentID) ?? Array.Empty<BaseNPC2>());
+(BasePlayer[])(MonumentsWatcher?.Call("GetMonumentNpcs_Old", monumentID) ?? Array.Empty<BasePlayer>());
 ```  
 
 ### GetMonumentNpcsNoAlloc  
 Used to fill your existing list with npcs located in the specified monument.  
 Returns **true** if at least one npc is added, otherwise **null**.  
 To call the **GetMonumentNpcsNoAlloc** method, you need to pass 2 parameters:  
-1. **monumentID** as a **string**;  
-1. **list** as **List\<BasePlayer>**.  
+1. **list** as **List\<BaseNPC2>**, **List\<BasePlayer>** or **List\<BaseEntity>**;  
+2. **monumentID** as a **string**.  
 
 ```csharp
-(bool)(MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", monumentID, yourList) ?? false);
-MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", monumentID, yourList);
+(bool)(MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", yourList, monumentID) ?? false);
+MonumentsWatcher?.Call("GetMonumentNpcsNoAlloc", yourList, monumentID);
 ```  
 
 ### GetNpcMonument  
 Used to retrieve the monument in which the specified npc is located.  
 Returns an **empty string** on failure.  
 To call the **GetNpcMonument** method, you need to pass 1 parameter:  
-1. Available options:  
-  **npcPlayer** as a **BasePlayer**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+1. **Npc**, available options:  
+  **npcPlayer** as a **BaseNPC2** or **BasePlayer**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
-(string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer) ?? string.Empty);//(BasePlayer)npcPlayer
+(string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer) ?? string.Empty);//(BaseNPC2 or BasePlayer)npcPlayer
+(string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer.net.ID) ?? string.Empty);//(NetworkableId)netID
 (string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer.net.ID.Value) ?? string.Empty);//(ulong)netID
-(string)(MonumentsWatcher?.Call("GetNpcMonument", npcPlayer.net.ID) ?? string.Empty);//(NetworkableId)netID ***recommended option***
 ```  
 
 ### GetNpcMonuments  
 Used to retrieve all monuments in which the specified npc is located.  
 Returns **null** on failure.  
 To call the **GetNpcMonuments** method, you need to pass 1 parameter:  
-1. Available options:  
-  **npcPlayer** as a **BasePlayer**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+1. **Npc**, available options:  
+  **npcPlayer** as a **BaseNPC2** or **BasePlayer**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
-(string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer) ?? Array.Empty<string>());//(BasePlayer)npcPlayer
+(string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer) ?? Array.Empty<string>());//(BaseNPC2 or BasePlayer)npcPlayer
+(string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID
 (string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer.net.ID.Value) ?? Array.Empty<string>());//(ulong)netID
-(string[])(MonumentsWatcher?.Call("GetNpcMonuments", npcPlayer.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID ***recommended option***
+```  
+
+### GetNpcMonumentsNoAlloc  
+Used to fill your existing list with npcs located in the specified monument.  
+Returns **true** if at least one npc is added, otherwise **null**.  
+To call the **GetNpcMonumentsNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **Npc**, available options:  
+  **npcPlayer** as a **BaseNPC2** or **BasePlayer**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetNpcMonumentsNoAlloc", yourList, npcPlayer.net.ID.Value) ?? false);
+MonumentsWatcher?.Call("GetNpcMonumentsNoAlloc", yourList, npcPlayer.net.ID.Value);
 ```  
 
 ### IsNpcInMonument  
@@ -542,15 +674,99 @@ Used to check whether the specified npc is in the specified monument.
 Returns a **false** on failure.  
 To call the **IsNpcInMonument** method, you need to pass 1 parameter:  
 1. **monumentID** as a **string**;  
-2. Available options:  
-  **npcPlayer** as a **BasePlayer**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+2. **Npc**, available options:  
+  **npcPlayer** as a **BaseNPC2** or **BasePlayer**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
+(bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer) ?? false);//(BaseNPC2)npcPlayer
 (bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer.net.ID) ?? false);//(NetworkableId)netID
 (bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer.net.ID.Value) ?? false);//(ulong)netID
-(bool)(MonumentsWatcher?.Call("IsNpcInMonument", monumentID, npcPlayer) ?? false);//(BasePlayer)npcPlayer ***recommended option***
+```  
+
+### GetMonumentAnimals  
+Used to retrieve an array of all animals located in the specified monument.  
+Returns **null** on failure.  
+To call the **GetMonumentAnimals** method, you need to pass 1 parameter:  
+1. **monumentID** as a **string**.  
+
+```csharp
+(BaseNPC2[])(MonumentsWatcher?.Call("GetMonumentAnimals", monumentID) ?? Array.Empty<BaseNPC2>());
+(BaseAnimalNPC[])(MonumentsWatcher?.Call("GetMonumentAnimals_Old", monumentID) ?? Array.Empty<BaseAnimalNPC>());
+```  
+
+### GetMonumentAnimalsNoAlloc  
+Used to fill your existing list with animals located in the specified monument.  
+Returns **true** if at least one animal is added, otherwise **null**.  
+To call the **GetMonumentAnimalsNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<BaseNPC2>**, **List\<BaseAnimalNPC>** or **List\<BaseEntity>**;  
+2. **monumentID** as a **string**.  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetMonumentAnimalsNoAlloc", yourList, monumentID) ?? false);
+MonumentsWatcher?.Call("GetMonumentAnimalsNoAlloc", yourList, monumentID);
+```  
+
+### GetAnimalMonument  
+Used to retrieve the monument in which the specified animal is located.  
+Returns an **empty string** on failure.  
+To call the **GetAnimalMonument** method, you need to pass 1 parameter:  
+1. **Animal**, available options:  
+  **animal** as a **BaseNPC2** or **BaseAnimalNPC**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(string)(MonumentsWatcher?.Call("GetAnimalMonument", animal) ?? string.Empty);//(BaseNPC2 or BaseAnimalNPC)animal
+(string)(MonumentsWatcher?.Call("GetAnimalMonument", animal.net.ID) ?? string.Empty);//(NetworkableId)netID
+(string)(MonumentsWatcher?.Call("GetAnimalMonument", animal.net.ID.Value) ?? string.Empty);//(ulong)netID
+```  
+
+### GetAnimalMonuments  
+Used to retrieve all monuments in which the specified animal is located.  
+Returns **null** on failure.  
+To call the **GetAnimalMonuments** method, you need to pass 1 parameter:  
+1. **Animal**, available options:  
+  **animal** as a **BaseNPC2** or **BaseAnimalNPC**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(string[])(MonumentsWatcher?.Call("GetAnimalMonuments", animal) ?? Array.Empty<string>());//(BaseNPC2 or BaseAnimalNPC)animal
+(string[])(MonumentsWatcher?.Call("GetAnimalMonuments", animal.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID
+(string[])(MonumentsWatcher?.Call("GetAnimalMonuments", animal.net.ID.Value) ?? Array.Empty<string>());//(ulong)netID
+```  
+
+### GetAnimalMonumentsNoAlloc  
+Used to fill your existing list with animals located in the specified monument.  
+Returns **true** if at least one animal is added, otherwise **null**.  
+To call the **GetAnimalMonumentsNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **Animal**, available options:  
+  **animal** as a **BaseNPC2** or **BaseAnimalNPC**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetAnimalMonumentsNoAlloc", yourList, animal.net.ID.Value) ?? false);
+MonumentsWatcher?.Call("GetAnimalMonumentsNoAlloc", yourList, animal.net.ID.Value);
+```  
+
+### IsAnimalInMonument  
+Used to check whether the specified animal is in the specified monument.  
+Returns a **false** on failure.  
+To call the **IsAnimalInMonument** method, you need to pass 1 parameter:  
+1. **monumentID** as a **string**;  
+2. **Animal**, available options:  
+  **animal** as a **BaseNPC2** or **BaseAnimalNPC**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("IsAnimalInMonument", monumentID, animal) ?? false);//(BaseNPC2)animal
+(bool)(MonumentsWatcher?.Call("IsAnimalInMonument", monumentID, animal.net.ID) ?? false);//(NetworkableId)netID
+(bool)(MonumentsWatcher?.Call("IsAnimalInMonument", monumentID, animal.net.ID.Value) ?? false);//(ulong)netID
 ```  
 
 ### GetMonumentEntities  
@@ -567,42 +783,57 @@ To call the **GetMonumentEntities** method, you need to pass 1 parameter:
 Used to fill your existing list with entities located in the specified monument.  
 Returns **true** if at least one entity is added, otherwise **null**.  
 To call the **GetMonumentEntitiesNoAlloc** method, you need to pass 2 parameters:  
-1. **monumentID** as a **string**;  
-1. **list** as **List\<BaseEntity>**.  
+1. **list** as **List\<BaseEntity>**;  
+2. **monumentID** as a **string**.  
 
 ```csharp
-(bool)(MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", monumentID, yourList) ?? false);
-MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", monumentID, yourList);
+(bool)(MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", yourList, monumentID) ?? false);
+MonumentsWatcher?.Call("GetMonumentEntitiesNoAlloc", yourList, monumentID);
 ```  
 
 ### GetEntityMonument  
 Used to retrieve the monument in which the specified entity is located.  
 Returns an **empty string** on failure.  
 To call the **GetEntityMonument** method, you need to pass 1 parameter:  
-1. Available options:  
+1. **Entity**, available options:  
   **entity** as a **BaseEntity**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
 (string)(MonumentsWatcher?.Call("GetEntityMonument", entity) ?? string.Empty);//(BaseEntity)entity
+(string)(MonumentsWatcher?.Call("GetEntityMonument", entity.net.ID) ?? string.Empty);//(NetworkableId)netID
 (string)(MonumentsWatcher?.Call("GetEntityMonument", entity.net.ID.Value) ?? string.Empty);//(ulong)netID
-(string)(MonumentsWatcher?.Call("GetEntityMonument", entity.net.ID) ?? string.Empty);//(NetworkableId)netID ***recommended option***
 ```  
 
 ### GetEntityMonuments  
 Used to retrieve all monuments in which the specified entity is located.  
 Returns **null** on failure.  
 To call the **GetEntityMonuments** method, you need to pass 1 parameter:  
-1. Available options:  
+1. **Entity**, available options:  
   **entity** as a **BaseEntity**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
 (string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity) ?? Array.Empty<string>());//(BaseEntity)entity
+(string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID
 (string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity.net.ID.Value) ?? Array.Empty<string>());//(ulong)netID
-(string[])(MonumentsWatcher?.Call("GetEntityMonuments", entity.net.ID) ?? Array.Empty<string>());//(NetworkableId)netID ***recommended option***
+```  
+
+### GetEntityMonumentsNoAlloc  
+Used to fill your existing list with entities located in the specified monument.  
+Returns **true** if at least one entity is added, otherwise **null**.  
+To call the **GetEntityMonumentsNoAlloc** method, you need to pass 2 parameters:  
+1. **list** as **List\<string>**;  
+2. **Entity**, available options:  
+  **entity** as a **BaseNPC2** or **BaseEntity**;  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
+
+```csharp
+(bool)(MonumentsWatcher?.Call("GetEntityMonumentsNoAlloc", yourList, entity.net.ID.Value) ?? false);
+MonumentsWatcher?.Call("GetEntityMonumentsNoAlloc", yourList, entity.net.ID.Value);
 ```  
 
 ### IsEntityInMonument  
@@ -610,13 +841,13 @@ Used to check whether the specified entity is in the specified monument.
 Returns a **false** on failure.  
 To call the **IsEntityInMonument** method, you need to pass 1 parameter:  
 1. **monumentID** as a **string**;  
-2. Available options:  
+2. **Entity**, available options:  
   **entity** as a **BaseEntity**;  
-  **netID** as a **ulong**;  
-  **netID** as a **NetworkableId**.  
+  **netID** as a **NetworkableId**;  
+  **netID** as a **ulong**(recommended).  
 
 ```csharp
+(bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity) ?? false);//(BaseEntity)entity
 (bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity.net.ID) ?? false);//(NetworkableId)netID
 (bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity.net.ID.Value) ?? false);//(ulong)netID
-(bool)(MonumentsWatcher?.Call("IsEntityInMonument", monumentID, entity) ?? false);//(BaseEntity)entity ***recommended option***
 ```  
