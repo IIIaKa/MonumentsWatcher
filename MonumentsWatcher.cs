@@ -47,7 +47,7 @@ using Oxide.Core.Libraries.Covalence;
 
 namespace Oxide.Plugins
 {
-	[Info("Monuments Watcher", "IIIaKa", "0.1.11")]
+	[Info("Monuments Watcher", "IIIaKa", "0.1.12")]
 	[Description("An API plugin which helps interact with players, NPCs, animals, and other entities inside monuments.")]
 	class MonumentsWatcher : RustPlugin
     {
@@ -60,7 +60,7 @@ namespace Oxide.Plugins
 			Hooks_OnSpawnableWatcherCreated = "OnSpawnableWatcherCreated", Hooks_OnSpawnableWatcherDeleted = "OnSpawnableWatcherDeleted",
 			Hooks_OnPlayerEnteredMonument = "OnPlayerEnteredMonument", Hooks_OnNpcEnteredMonument = "OnNpcEnteredMonument", Hooks_OnAnimalEnteredMonument = "OnAnimalEnteredMonument", Hooks_OnEntityEnteredMonument = "OnEntityEnteredMonument",
 			Hooks_OnPlayerExitedMonument = "OnPlayerExitedMonument", Hooks_OnNpcExitedMonument = "OnNpcExitedMonument", Hooks_OnAnimalExitedMonument = "OnAnimalExitedMonument", Hooks_OnEntityExitedMonument = "OnEntityExitedMonument";
-        private static Hash<string, MonumentWatcher> _monumentsList;
+        private Hash<string, MonumentWatcher> _monumentsList = new Hash<string, MonumentWatcher>();
 		private static Hash<ulong, List<MonumentWatcher>> _playersInMonuments, _npcsInMonuments, _animalsInMonuments, _entitiesInMonuments;
 		private readonly string[] _defaultHooks = new string[] { "OnEntitySpawned", "OnEntityDeath", "OnEntityKill", "OnPlayerTeleported" };
 		#endregion
@@ -117,11 +117,11 @@ namespace Oxide.Plugins
 			string langKey;
             var oldLangKeys = _config.LanguageKeys ?? new List<string>();
             _config.LanguageKeys = new List<string>() { "en" };
-			for (int i = 0; i < oldLangKeys.Count; i++)
+            for (int i = 0; i < oldLangKeys.Count; i++)
             {
                 langKey = ToLangKey(oldLangKeys[i]);
-                if (!langKey.Equals("ru", StringComparison.OrdinalIgnoreCase) && !_config.LanguageKeys.Contains(langKey, StringComparer.OrdinalIgnoreCase))
-					_config.LanguageKeys.Add(langKey);
+                if (langKey != "ru" && !_config.LanguageKeys.Contains(langKey))
+                    _config.LanguageKeys.Add(langKey);
             }
 			
 			_config.TrackedCategories ??= new HashSet<MonumentCategory>();
@@ -160,6 +160,8 @@ namespace Oxide.Plugins
 			[Str_CargoShip] = "CargoShip",
 			["airfield_1"] = "Airfield",
 			["airfield_1_station"] = "Airfield Station",
+			["apartments_complex_1"] = "Apartments Complex",
+			["apartments_complex_1_station"] = "Apartments Complex Station",
 			["arctic_research_base_a"] = "Arctic Research Base",
 			["arctic_research_base_a_station"] = "Arctic Station",
 			["bandit_town"] = "Bandit Camp",
@@ -315,6 +317,8 @@ namespace Oxide.Plugins
 			[Str_CargoShip] = "Грузовой корабль",
 			["airfield_1"] = "Аэропорт",
 			["airfield_1_station"] = "Станция Аэропорт",
+			["apartments_complex_1"] = "Жилой комплекс",
+            ["apartments_complex_1_station"] = "Станция Комплекс",
 			["arctic_research_base_a"] = "Арктическая база",
 			["arctic_research_base_a_station"] = "Станция Арктическая",
 			["bandit_town"] = "Лагерь бандитов",
@@ -502,7 +506,7 @@ namespace Oxide.Plugins
 				monumentKey = ClearMonumentName(prefab);
 				if (!_defaultBoundsValues.ContainsKey(monumentKey))
 					continue;
-				if (monument.IsSafeZone)
+				if (monument.IsSafeZone || monumentKey == "apartments_complex_1")
                 {
 					CreateWatcher(monumentKey, MonumentCategory.SafeZone, monument.transform, prefab);
 					continue;
@@ -850,19 +854,31 @@ namespace Oxide.Plugins
                 player.Reply(message);
         }
 		
-		private static string ToLangKey(string langKey)
+		private static string ToLangKey(string input)
         {
-            if (string.IsNullOrWhiteSpace(langKey))
+            if (string.IsNullOrWhiteSpace(input))
+                return "en";
+            int inputLength = input.Length;
+            if (inputLength != 2 && inputLength != 5)
                 return "en";
 
-            var parts = langKey.Split('-');
-            if (parts.Length < 1 || !parts[0].All(c => char.IsLetter(c)))
-                return "en";
+            string langKey;
+            for (int i = 0; i < Translate.allServerLanguages.Count; i++)
+            {
+                langKey = Translate.allServerLanguages[i];
+                if (langKey.Length != inputLength)
+                    continue;
 
-            if (parts.Length < 2 || !parts[1].All(c => char.IsLetter(c)))
-                return parts[0].ToLowerInvariant();
-
-            return $"{parts[0].ToLowerInvariant()}-{parts[1].ToUpperInvariant()}";
+                int j;
+                for (j = 0; j < inputLength; j++)
+                {
+                    if (langKey[j] != input[j] && char.ToUpperInvariant(langKey[j]) != char.ToUpperInvariant(input[j]))
+                        break;
+                }
+                if (j == inputLength)
+                    return langKey;
+            }
+            return "en";
         }
 		
 		private void HandleLanguageFile(Dictionary<string, string> langFile, string langKey)
@@ -1445,7 +1461,6 @@ namespace Oxide.Plugins
 			Instance = this;
 			permission.RegisterPermission(PERMISSION_ADMIN, this);
 			AddCovalenceCommand(_config.Command, nameof(MonumentsWatcher_Command));
-			_monumentsList = new Hash<string, MonumentWatcher>();
 			_playersInMonuments = new Hash<ulong, List<MonumentWatcher>>();
 			_npcsInMonuments = new Hash<ulong, List<MonumentWatcher>>();
 			_animalsInMonuments = new Hash<ulong, List<MonumentWatcher>>();
@@ -1477,7 +1492,6 @@ namespace Oxide.Plugins
 			_harmony?.UnpatchAll(IdForHarmony);
 			ClearWatchers();
 			_isReady = false;
-			_monumentsList = null;
 			_playersInMonuments = null;
 			_npcsInMonuments = null;
 			_animalsInMonuments = null;
@@ -1673,6 +1687,7 @@ namespace Oxide.Plugins
 			{
 				{ Str_CargoShip, new BoundsValues(new Vector3(0f, 17f, 10f), new Vector3(26f, 60f, 147f)) },
 				{ "airfield_1", new BoundsValues(new Vector3(0f, 20f, -25f), new Vector3(400f, 70f, 250f)) },
+				{ "apartments_complex_1", new BoundsValues(new Vector3(-30f, 35f, 20f), new Vector3(220f, 80f, 200f)) },
 				{ "arctic_research_base_a", new BoundsValues(new Vector3(-2f, 20f, -2f), new Vector3(180f, 70f, 180f)) },
 				{ "bandit_town", new BoundsValues(new Vector3(2.5f, 15f, 0f), new Vector3(220f, 70f, 180f)) },
 				{ "compound", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(180f, 60f, 200f)) },
@@ -1706,11 +1721,11 @@ namespace Oxide.Plugins
 				{ "junkyard_1", new BoundsValues(new Vector3(0f, 25f, 10f), new Vector3(200f, 60f, 200f)) },
 				{ "launch_site_1", new BoundsValues(new Vector3(0f, 35f, -25f), new Vector3(600f, 140f, 340f)) },
 				{ "lighthouse", new BoundsValues(new Vector3(8f, 35f, 2f), new Vector3(100f, 100f, 100f)) },
-				{ "military_tunnel_1", new BoundsValues(new Vector3(0f, 25f, 0f), new Vector3(300f, 100f, 300f)) },
+				{ "military_tunnel_1", new BoundsValues(new Vector3(0f, 75f, 0f), new Vector3(300f, 100f, 300f)) },
 				{ "mining_quarry_a", new BoundsValues(new Vector3(2f, 15f, -5f), new Vector3(80f, 40f, 80f)) },
 				{ "mining_quarry_b", new BoundsValues(new Vector3(-5f, 15f, -7f), new Vector3(100f, 40f, 90f)) },
 				{ "mining_quarry_c", new BoundsValues(new Vector3(-6f, 15f, 0f), new Vector3(80f, 40f, 80f)) },
-				{ "nuclear_missile_silo", new BoundsValues(new Vector3(0f, 20f, 0f), new Vector3(180f, 120f, 180f)) },
+				{ "nuclear_missile_silo", new BoundsValues(new Vector3(0f, 66f, 0f), new Vector3(180f, 120f, 180f)) },
 				{ "oilrig_1", new BoundsValues(new Vector3(3f, 25f, 12f), new Vector3(100f, 150f, 130f)) },
 				{ "oilrig_2", new BoundsValues(new Vector3(18f, 10f, -2f), new Vector3(100f, 120f, 100f)) },
 				{ "powerplant_1", new BoundsValues(new Vector3(-15f, 35f, -5f), new Vector3(260f, 100f, 300f)) },
@@ -1752,7 +1767,7 @@ namespace Oxide.Plugins
 				{ "cave_medium_hard", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
 				{ "cave_large_medium", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
 				{ "cave_large_hard", new BoundsValues(new Vector3(8f, -21f, 0f), new Vector3(45f, 35f, 80f)) },
-				{ "cave_large_sewers_hard", new BoundsValues(new Vector3(50f, -25f, -7f), new Vector3(170f, 40f, 165f)) },
+				{ "cave_large_sewers_hard", new BoundsValues(new Vector3(50f, 5f, -7f), new Vector3(170f, 40f, 165f)) },
 				{ "ice_lake_1", new BoundsValues(new Vector3(-2f, 15f, 0f), new Vector3(140f, 35f, 160f)) },
 				{ "ice_lake_2", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(150f, 35f, 150f)) },
 				{ "ice_lake_3", new BoundsValues(new Vector3(0f, 15f, 0f), new Vector3(180f, 35f, 240f)) },
@@ -2211,8 +2226,8 @@ namespace Oxide.Plugins
             {
 				if (Instance != null)
 				{
-					_monumentsList.Remove(ID);
-                    foreach (var player in PlayersList)
+					Instance._monumentsList.Remove(ID);
+					foreach (var player in PlayersList)
                     {
                         if (player.IsValid())
                             OnPlayerExit(player, Str_MonumentDestroyed, false);
